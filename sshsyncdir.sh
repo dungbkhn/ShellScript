@@ -16,8 +16,8 @@ compare_listfile_inremote="comparelistfile_remote.sh"
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 memtemp_local="$appdir_local"/.temp
 memtemp_remote="$appdir_remote"/.temp
-destipv6addr="backup@xxxx"
-destipv6addr_scp="backup@[xxxx]"
+destipv6addr="backup@x"
+destipv6addr_scp="backup@[x]"
 
 filepubkey=/home/dungnt/.ssh/id_rsa_backup_58
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
@@ -269,8 +269,7 @@ find_list_same_files () {
 	local mycommand
 	local pathname
 	local filesize
-	#local md5hash
-	#local md5tailhash
+	local md5hash
 	local mtime
 	local mtime_temp
 	local listfiles="listfiles.txt"
@@ -288,12 +287,12 @@ find_list_same_files () {
 			printf "%s/%s/0/0/0\n" "$pathname" "d" >> "$mytemp"/"$listfiles"
 		else
 			filesize=$(wc -c "$pathname" | awk '{print $1}')
-			#md5hash=$(head -c 1024 "$pathname" | md5sum | awk '{ print $1 }')
+			md5hash=$(head -c 1024 "$pathname" | md5sum | awk '{ print $1 }')
 			#md5tailhash=$(get_src_content_file_md5sum "$pathname")
 			mtime_temp=$(stat "$pathname" --printf='%y\n')
 			mtime=$(date +'%s' -d "$mtime_temp")
 			#printf "%s/%s/%s/%s/%s/%s\n" "$pathname" "f" "$filesize" "$md5hash" "$md5tailhash" "$mtime" >> "$mytemp"/"$listfiles"
-			printf "%s/%s/%s/%s\n" "$pathname" "f" "$filesize" "$mtime" >> "$mytemp"/"$listfiles"
+			printf "%s/%s/%s/%s/%s\n" "$pathname" "f" "$filesize" "$md5hash" "$mtime" >> "$mytemp"/"$listfiles"
 		fi
 	done
 
@@ -473,22 +472,25 @@ sync_file_in_dir(){
 	local afterslash_3
 	local afterslash_4
 	local afterslash_5
+	local afterslash_6
 	
 	# declare array
 	declare -a name
 	declare -a size
-	declare -a mtime_arr
+	declare -a md5hash
+	declare -a mtime
 	
 	if [ -f "$mytemp"/"$outputfile1_inremote" ] ; then
 		count=0
-		while IFS=/ read beforeslash afterslash_1 afterslash_2 afterslash_3 afterslash_4 afterslash_5
+		while IFS=/ read beforeslash afterslash_1 afterslash_2 afterslash_3 afterslash_4 afterslash_5 afterslash_6
 		do
 			if [ "$afterslash_1" != "" ] ; then
 				if [ "$afterslash_2" -eq 0 ] ; then
 					name[$count]="$afterslash_1"
 					size[$count]="$afterslash_4"
-					mtime_arr[$count]="$afterslash_5"
-					echo "${name[$count]}""-----""${size[$count]}""-----""${mtime[$count]}"
+					md5hash[$count]="$afterslash_5"
+					mtime[$count]="$afterslash_6"
+					echo "${name[$count]}""-----""${size[$count]}""-----""${md5hash[$count]}""-----""${mtime[$count]}"
 					count=$(($count + 1))
 				fi
 			else
