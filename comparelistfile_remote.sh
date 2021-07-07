@@ -53,21 +53,25 @@ param3=$3
 declare -a names
 declare -a isfile
 declare -a filesize
+declare -a md5hash
 declare -a mtime
 declare -a hassamefile
 
 declare -a names_remote
 declare -a isfile_remote
 declare -a filesize_remote
+declare -a md5hash_remote
 declare -a mtime_remote
 declare -a hassamefile_remote
 
 declare -a names_nt
 declare -a filesize_nt
+declare -a md5hash_nt
 declare -a mtime_nt
 
 declare -a names_remote_nt
 declare -a filesize_remote_nt
+declare -a md5hash_remote_nt
 declare -a mtime_remote_nt
 declare -a isselected_remote_nt
 
@@ -77,12 +81,13 @@ mtime_temp=""
 
 if [ -f "$memtemp""/""$param1" ] ; then
 
-	while IFS=/ read beforeslash afterslash_1 afterslash_2 afterslash_3 afterslash_4
+	while IFS=/ read beforeslash afterslash_1 afterslash_2 afterslash_3 afterslash_4 afterslash_5
 	do
 		names[$count]="$afterslash_1"
 		isfile[$count]="$afterslash_2"
 		filesize[$count]="$afterslash_3"
-		mtime[$count]="$afterslash_4"
+		md5hash[$count]="$afterslash_4"
+		mtime[$count]="$afterslash_5"
 		hassamefile[$count]=0
 		count=$(($count + 1))
 	done < "$memtemp""/""$param1"
@@ -102,6 +107,7 @@ if [ -f "$memtemp""/""$param1" ] ; then
 			
 			isfile_remote[$count]="f"
 			filesize_remote[$count]=$(wc -c "$pathname" | awk '{print $1}')
+			md5hash_remote[$count]=$(head -c 1024 "$pathname" | md5sum | awk '{ print $1 }')
 			mtime_temp=$(stat "$pathname" --printf='%y\n')
 			mtime_remote[$count]=$(date +'%s' -d "$mtime_temp")
 			#printf "%s/%s/%s/%s/%s\n" "$pathname" "f" "${filesize_remote[$count]}" "${headmd5sum_remote[$count]}" "${tailmd5sum_remote[$count]}" >> "$memtemp""/""$param3"
@@ -121,10 +127,10 @@ if [ -f "$memtemp""/""$param1" ] ; then
 					
 					hassamefile[$i]=1
 					hassamefile_remote[$j]=1
-					if [ "${mtime[$i]}" == "${mtime_remote[$j]}" ] && [ "${filesize[$i]}" == "${filesize_remote[$j]}" ] ; then
-						printf "./%s/1/%s/0/0\n" "${names[$i]}" "${names_remote[$j]}" >> "$memtemp""/""$param3"
+					if [ "${mtime[$i]}" == "${mtime_remote[$j]}" ] && [ "${filesize[$i]}" == "${filesize_remote[$j]}" ] && [ "${md5hash[$i]}" == "${md5hash_remote[$j]}" ] ; then
+						printf "./%s/1/%s/0/null/0\n" "${names[$i]}" "${names_remote[$j]}" >> "$memtemp""/""$param3"
 					else
-						printf "./%s/0/%s/%s/%s\n" "${names[$i]}" "${names_remote[$j]}" "${filesize_remote[$j]}" "${mtime_remote[$j]}" >> "$memtemp""/""$param3"
+						printf "./%s/0/%s/%s/%s/%s\n" "${names[$i]}" "${names_remote[$j]}" "${filesize_remote[$j]}" "${md5hash_remote[$j]}" "${mtime_remote[$j]}" >> "$memtemp""/""$param3"
 					fi
 					count=1
 					found=1
@@ -147,8 +153,8 @@ if [ -f "$memtemp""/""$param1" ] ; then
 		if [ "${hassamefile[$i]}" -eq 0 ] && [ "${isfile[$i]}" == "f" ] ; then
 			names_nt[$count]="${names[$i]}"
 			filesize_nt[$count]="${filesize[$i]}"
+			md5hash_nt[$count]="${md5hash[$i]}"
 			mtime_nt[$count]="${mtime[$i]}"
-			#printf "%s/%s/%s/%s\n" "${names_nt[$count]}" "${filesize_nt[$count]}" "${headmd5sum_nt[$count]}" "${tailmd5sum_nt[$count]}" >> "$memtemp""/""$param3"
 			count=$(($count + 1))
 		fi
 		
@@ -164,8 +170,8 @@ if [ -f "$memtemp""/""$param1" ] ; then
 			names_remote_nt[$count]="${names_remote[$i]}"
 			isselected_remote_nt[$count]=0
 			filesize_remote_nt[$count]="${filesize_remote[$i]}"
+			md5hash_remote_nt[$count]="${md5hash_remote[$i]}"
 			mtime_remote_nt[$count]="${mtime_remote[$i]}"
-			#printf "%s/%s/%s/%s\n" "${names_remote_nt[$count]}" "${filesize_remote_nt[$count]}" "${headmd5sum_remote_nt[$count]}" "${tailmd5sum_remote_nt[$count]}" >> "$memtemp""/""$param3"
 			count=$(($count + 1))
 		fi
 		
@@ -178,8 +184,8 @@ if [ -f "$memtemp""/""$param1" ] ; then
 		count=0
 		for j in "${!names_remote_nt[@]}"
 		do
-			if [ "${isselected_remote_nt[$j]}" -eq 0 ] && [ "${mtime_nt[$i]}" == "${mtime_remote_nt[$j]}" ] && [ "${filesize_nt[$i]}" == "${filesize_remote_nt[$j]}" ] ; then
-				printf "./%s/2/%s/0/0\n" "${names_nt[$i]}" "${names_remote_nt[$j]}" >> "$memtemp""/""$param3"
+			if [ "${isselected_remote_nt[$j]}" -eq 0 ] && [ "${mtime_nt[$i]}" == "${mtime_remote_nt[$j]}" ] && [ "${filesize_nt[$i]}" == "${filesize_remote_nt[$j]}" ] && [ "${md5hash_nt[$i]}" == "${md5hash_remote_nt[$j]}" ] ; then
+				printf "./%s/2/%s/0/null/0\n" "${names_nt[$i]}" "${names_remote_nt[$j]}" >> "$memtemp""/""$param3"
 				mv "$param2""/""${names_remote_nt[$j]}" "$param2""/""${names_nt[$i]}"
 				isselected_remote_nt[$j]=1
 				count=1
@@ -199,7 +205,7 @@ if [ -f "$memtemp""/""$param1" ] ; then
 	do
 		if [ "${isselected_remote_nt[$i]}" -eq 0 ] ; then
 			rm "$param2""/""${names_remote_nt[$i]}"
-			printf "./null/3/%s/0/0\n" "${names_remote_nt[$j]}" >> "$memtemp""/""$param3"
+			printf "./null/3/%s/0/null/0\n" "${names_remote_nt[$j]}" >> "$memtemp""/""$param3"
 		fi
 	done
 
