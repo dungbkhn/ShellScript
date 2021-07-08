@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#NOTE: REMOTE COMPARE WORKS ONLY WITH FILE SIZE < 4GB
-#USE 64BIT-LINUX AT REMOTE TO OVERCOME THIS INCONV.
 
 shopt -s dotglob
 shopt -s nullglob
@@ -16,8 +14,8 @@ compare_listfile_inremote="comparelistfile_remote.sh"
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 memtemp_local="$appdir_local"/.temp
 memtemp_remote="$appdir_remote"/.temp
-destipv6addr="backup@x"
-destipv6addr_scp="backup@[x]"
+destipv6addr="backup@"
+destipv6addr_scp="backup@[]"
 
 filepubkey=/home/dungnt/.ssh/id_rsa_backup_58
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
@@ -102,26 +100,22 @@ verify_logged() {
 	
 	if [ -f "$filepubkey" ] ; then
 	
-		mycommand="ssh -i ""$filepubkey"" $destipv6addr ""'find ""$logtimedir_remote"" -maxdepth 1 -type f -name ""$logtimefile""'"
-		echo "$mycommand"
-		result=$(eval $mycommand)
+		result=$(ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "find ${logtimedir_remote} -maxdepth 1 -type f -name ${logtimefile}")
 		cmd=$?
-		
+		echo "$result"
 		if [ "$cmd" -eq 0 ] && [ "$result" ] ; then
 				#echo 'tim thay' $logtimefile
 				
-				mycommand="ssh -i ""$filepubkey"" $destipv6addr ""'tail ""$logtimedir_remote""/""$logtimefile""'"
-				echo "$mycommand"
-				result=$(eval $mycommand)
+				result=$(ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "tail ${logtimedir_remote}/${logtimefile}")
 				cmd=$?
-				
+				echo "$result"
 				if [ "$cmd" -eq 0 ] && [ "$result" ] ; then
 					curtime=$(($(date +%s%N)/1000000))
 					#printf 'curtime:%s\n' "$curtime"
 					value=$(echo "${result##*$'\n'}")
 					printf 'value:%s\n' "$value"
 					delaytime=$(( ( $curtime - $value ) / 60000 ))
-					#printf 'delaytime:%s\n' "$delaytime"" minutes"
+					printf 'delaytime:%s\n' "$delaytime"" minutes"
 					if [ "$delaytime" -gt 6 ] ; then
 						#ko thay active web user
 						kq=1
@@ -141,121 +135,6 @@ verify_logged() {
 
 #------------------------------ FIND SAME FILE --------------------------------
 
-get_src_content_file_md5sum(){
-	local param1=$1
-	local cmd
-	local filesizedest
-	local cursizedest
-	local mytemp="$memtemp_local"
-	local kq
-	
-	rm "$mytemp""/output.beingcompare" > /dev/null 2>&1
-	
-	filesizedest=$(wc -c "$param1" | awk '{print $1}')
-	cmd=$?
-	
-	if [ "$cmd" -eq 0 ] && [ "$filesizedest" ] && [ "$filesizedest" -gt 0 ] ; then
-		cursizedest=$(($filesizedest / $truncsize))
-		if [ "$cursizedest" -gt 0 ] ; then
-			cursizedest=$(($cursizedest - 1))
-			dd if="$param1" of="$mytemp""/output.beingcompare" bs="$copyfilesize" count=2 skip="$cursizedest" > /dev/null 2>&1
-		else
-			dd if="$param1" of="$mytemp""/output.beingcompare" bs="$copyfilesize" count=1 skip="0" > /dev/null 2>&1
-		fi
-		
-		kq=$(md5sum "$mytemp""/output.beingcompare" | awk '{ print $1 }')
-		
-	else
-		kq="null"
-	fi
-	
-	echo "$kq"
-}
-
-get_src_content_file_md5sum_w_offset(){
-	local param=$1
-	local offset=$2
-	local jumpoffset
-	local skipbs
-	local cursizedest
-	local s
-	local startoffset
-	local mytemp="$memtemp_local"
-	local kq
-
-	rm "$mytemp""/output.beingcompare2" > /dev/null 2>&1
-	rm "$mytemp""/output.beingcompare3" > /dev/null 2>&1
-	
-	touch "$mytemp""/output.beingcompare3" > /dev/null 2>&1
-	
-	jumpoffset=0
-	startoffset="$offset"
-	
-	while [ $offset -gt 0 ] ; do
-		#echo "$offset"
-		if [ "$offset" -gt 100000000 ] ; then
-			s=100000000
-			cursizedest=$(($offset / $s))
-			skipbs=$(($jumpoffset / $s))
-			dd if="$param" of="$mytemp""/output.beingcompare2" bs="100MB" count="$cursizedest" skip="$skipbs" > /dev/null 2>&1
-			jumpoffset=$(($jumpoffset + ($cursizedest * $s)))
-			offset=$(($startoffset - $jumpoffset))
-		elif [ "$offset" -gt 10000000 ] ; then
-			s=10000000
-			cursizedest=$(($offset / $s))
-			skipbs=$(($jumpoffset / $s))
-			dd if="$param" of="$mytemp""/output.beingcompare2" bs="10MB" count="$cursizedest" skip="$skipbs" > /dev/null 2>&1
-			jumpoffset=$(($jumpoffset + ($cursizedest * $s)))
-			offset=$(($startoffset - $jumpoffset))
-		elif [ "$offset" -gt 1000000 ] ; then
-			s=1000000
-			cursizedest=$(($offset / $s))
-			skipbs=$(($jumpoffset / $s))
-			dd if="$param" of="$mytemp""/output.beingcompare2" bs="1MB" count="$cursizedest" skip="$skipbs" > /dev/null 2>&1
-			jumpoffset=$(($jumpoffset + ($cursizedest * $s)))
-			offset=$(($startoffset - $jumpoffset))
-		elif [ "$offset" -gt 100000 ] ; then
-			s=100000
-			cursizedest=$(($offset / $s))
-			skipbs=$(($jumpoffset / $s))
-			dd if="$param" of="$mytemp""/output.beingcompare2" bs="100kB" count="$cursizedest" skip="$skipbs" > /dev/null 2>&1
-			jumpoffset=$(($jumpoffset + ($cursizedest * $s)))
-			offset=$(($startoffset - $jumpoffset))
-		elif [ "$offset" -gt 10000 ] ; then
-			s=10000
-			cursizedest=$(($offset / $s))
-			skipbs=$(($jumpoffset / $s))
-			dd if="$param" of="$mytemp""/output.beingcompare2" bs="10kB" count="$cursizedest" skip="$skipbs" > /dev/null 2>&1
-			jumpoffset=$(($jumpoffset + ($cursizedest * $s)))
-			offset=$(($startoffset - $jumpoffset))
-		elif [ "$offset" -gt 1000 ] ; then
-			s=1000
-			cursizedest=$(($offset / $s))
-			skipbs=$(($jumpoffset / $s))
-			dd if="$param" of="$mytemp""/output.beingcompare2" bs="1kB" count="$cursizedest" skip="$skipbs" > /dev/null 2>&1
-			jumpoffset=$(($jumpoffset + ($cursizedest * $s)))
-			offset=$(($startoffset - $jumpoffset))
-		else
-			s=1
-			cursizedest=$(($offset / $s))
-			skipbs=$(($jumpoffset / $s))
-			dd if="$param" of="$mytemp""/output.beingcompare2" bs="1c" count="$cursizedest" skip="$skipbs" > /dev/null 2>&1
-			jumpoffset=$(($jumpoffset + ($cursizedest * $s)))
-			offset=$(($startoffset - $jumpoffset))
-		fi
-		
-		cat "$mytemp""/output.beingcompare2" >> "$mytemp""/output.beingcompare3"
-
-	done
-	
-	filesize=$(wc -c "$mytemp""/output.beingcompare3" | awk '{print $1}')
-	#echo "filesize:""$filesize"
-	kq=$(get_src_content_file_md5sum "$mytemp""/output.beingcompare3")
-
-	echo "$kq"
-}
-
-#this file will return a path to a file
 find_list_same_files () {
 	local param1=$1
 	local param2=$2
@@ -273,7 +152,7 @@ find_list_same_files () {
 	local mtime
 	local mtime_temp
 	local listfiles="listfiles.txt"
-	local outputfile1_inremote="outputfile1_inremote.txt"
+	local outputfile_inremote="outputfile_inremote.txt"
 	
 	
 	rm "$mytemp"/*
@@ -298,41 +177,44 @@ find_list_same_files () {
 
 	cd "$workingdir"/
 	
-	shopt -u nullglob
+
 	
-	mycommand="scp -i ""$filepubkey"" -p ""$mytemp""/""$listfiles"" ""$destipv6addr_scp"":""$memtemp_remote""/"
-	echo "$mycommand"
-	result=$(eval $mycommand)
+	result=$(scp -i "$filepubkey" -p "$mytemp"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
+	#echo "$mycommand"
+	#result=$(eval $mycommand)
 	cmd1=$?
-	myprintf "scp listfile" "$cmd1"
+	myprintf "scp 1 listfile" "$cmd1"
 	
-	mycommand="scp -i ""$filepubkey"" -p ""$dir_contains_uploadfiles""/""$compare_listfile_inremote"" ""$destipv6addr_scp"":""$memtemp_remote""/"
-	echo "$mycommand"
-	result=$(eval $mycommand)
+	
+		
+	result=$(scp -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+	#echo "$mycommand"
+	#result=$(eval $mycommand)
 	cmd2=$?
-	myprintf "scp listfile" "$cmd2"
+	myprintf "scp 2 listfile" "$cmd2"
 	
-	shopt -s nullglob
+	
 	
 	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] ; then
 
-		mycommand="ssh -i ""$filepubkey"" $destipv6addr ""'rm ""$memtemp_remote""/""$outputfile1_inremote""; bash ""$memtemp_remote""/""comparelistfile_remote.sh ""/""$listfiles"" ""$param2"" ""$outputfile1_inremote""'"
-		echo "$mycommand"
-		result=$(eval $mycommand)
+		result=$(ssh -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
 		cmd=$?
 		
-		shopt -u nullglob
+		myprintf "ssh remove outputfile" "$cmd"
 		
+		result=$(ssh -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/comparelistfile_remote.sh /${listfiles} ${param2} ${outputfile_inremote}")
+		cmd=$?
+		
+		myprintf "ssh gen outputfile" "$cmd"
+
 		rm "$mytemp"/"$listfiles"
 		
-		mycommand="scp -i ""$filepubkey"" -p ""$destipv6addr_scp"":""$memtemp_remote""/""$outputfile1_inremote"" ""$mytemp""/"
-		echo "$mycommand"
-		result=$(eval $mycommand)
+		result=$(scp -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
+		#echo "$mycommand"
+		#result=$(eval $mycommand)
 		cmd=$?
 		myprintf "scp getback listfile" "$cmd"
-		
-		shopt -s nullglob
-		
+
 	fi
 	
 	
@@ -340,129 +222,11 @@ find_list_same_files () {
 
 #------------------------------ COPY FILE --------------------------------
 
-sync_file_in_dir_old(){
-	local param1=$1
-	local param2=$2
-	local mytemp="$memtemp_local"
-	local outputfile1_inremote="outputfile1_inremote.txt"
-	local cmd
-	local findresult
-	local count
-	local beforeslash
-	local afterslash_1
-	local afterslash_2
-	local afterslash_3
-	local afterslash_4
-	local afterslash_5
-	local afterslash_6
-	local filesize
-	local md5tailhash
-	local mtime
-	local mtime_temp
-	
-	# declare array
-	declare -a name
-	declare -a size
-	declare -a tailmd5sum
-	declare -a mtime_arr
-	
-	if [ -f "$mytemp"/"$outputfile1_inremote" ] ; then
-		count=0
-		while IFS=/ read beforeslash afterslash_1 afterslash_2 afterslash_3 afterslash_4 afterslash_5 afterslash_6
-		do
-			if [ "$afterslash_1" != "" ] ; then
-				if [ "$afterslash_2" -eq 0 ] ; then
-					name[$count]="$afterslash_1"
-					size[$count]="$afterslash_4"
-					tailmd5sum[$count]="$afterslash_5"
-					mtime_arr[$count]="$afterslash_6"
-					echo "${name[$count]}""-----""${size[$count]}""-----""${tailmd5sum[$count]}""-----""${mtime[$count]}"
-					count=$(($count + 1))
-				fi
-			else
-				echo "--------------------file received valid---------------------"
-			fi
-		done < "$mytemp"/"$outputfile1_inremote"
-		
-		
-		count=0
-		for i in "${!name[@]}"
-		do
-			findresult=$(find "$param1" -maxdepth 1 -type f -name "${name[$i]}")
-			#echo "findresultlandau-----------:""$findresult"
-			cmd=$?
-			#neu tim thay
-			if [ "$cmd" -eq 0 ] && [ "$findresult" ] ; then
-				filesize=$(wc -c "$param1""/""${name[$i]}" | awk '{print $1}')
-				mtime_temp=$(stat "$param1""/""${name[$i]}" --printf='%y\n')
-				mtime=$(date +'%s' -d "$mtime_temp")
-				#echo "${name[$i]}""-----""$filesize""-----""$md5tailhash""-----""$mtime"
-				#echo "${name[$i]}""-----""${size[$i]}""-----""${tailmd5sum[$i]}""-----""${mtime_arr[$i]}"
-				if [ "$filesize" -eq "${size[$i]}" ] ; then
-					md5tailhash=$(get_src_content_file_md5sum "$findresult")
-					#echo "$md5tailhash"
-					if [ "$mtime" -eq "${mtime_arr[$i]}" ] ; then
-						if [ "$md5tailhash" == "${tailmd5sum[$i]}" ] ; then
-							echo '11--------'"${name[$i]}"' ten, size, mtime, tailhash bang nhau'
-						else
-							echo '12--------'"${name[$i]}"' ten, size, mtime bang nhau nhung tailhash khac nhau'
-						fi
-					elif [ "$mtime" -gt "${mtime_arr[$i]}" ] ; then
-						if [ "$md5tailhash" == "${tailmd5sum[$i]}" ] ; then
-							echo '21--------'"${name[$i]}"' ten, size, tailhash bang nhau nhung mtime remote nho hon'
-						else
-							echo '22--------'"${name[$i]}"' ten, size bang nhau nhung tailhash khac nhau, mtime remote nho hon'
-						fi
-					else
-						if [ "$md5tailhash" == "${tailmd5sum[$i]}" ] ; then
-							echo '31--------'"${name[$i]}"' ten, size, tailhash bang nhau nhung mtime remote lon hon'
-						else
-							echo '32--------'"${name[$i]}"' ten, size bang nhau nhung tailhash khac nhau, mtime remote lon hon'
-						fi
-					fi
-				elif [ "$filesize" -gt "${size[$i]}" ] ; then
-					echo '001--------'"${name[$i]}"':  cung ten nhung kich thuoc phia remote nho hon'
-					md5tailhash=$(get_src_content_file_md5sum_w_offset "$findresult" "${size[$i]}")
-					#echo "find:""$findresult""---------""${size[$i]}""---------"
-					#echo "md5tailhash:""$md5tailhash"
-					#echo "${tailmd5sum[$i]}"
-					
-					if [ "$mtime" -eq "${mtime_arr[$i]}" ] ; then
-						if [ "$md5tailhash" == "${tailmd5sum[$i]}" ] ; then
-							echo '001-11--------'"${name[$i]}"' ten, mtime, tailhash bang nhau'
-						else
-							echo '001-12--------'"${name[$i]}"' ten, mtime bang nhau nhung tailhash khac nhau'
-						fi
-					elif [ "$mtime" -gt "${mtime_arr[$i]}" ] ; then
-						if [ "$md5tailhash" == "${tailmd5sum[$i]}" ] ; then
-							echo '001-21--------'"${name[$i]}"' ten, tailhash bang nhau nhung mtime remote nho hon'
-						else
-							echo '001-22--------'"${name[$i]}"' ten bang nhau nhung tailhash khac nhau, mtime remote nho hon'
-						fi
-					else
-						if [ "$md5tailhash" == "${tailmd5sum[$i]}" ] ; then
-							echo '001-31--------'"${name[$i]}"' ten, tailhash bang nhau nhung mtime remote lon hon'
-						else
-							echo '001-32--------'"${name[$i]}"' ten, nhung tailhash khac nhau, mtime remote lon hon'
-						fi
-					fi
-				else
-					echo '00000000000002--------'"${name[$i]}"':  cung ten nhung kich thuoc phia remote lon hon'
-				fi
-			#neu ko tim thay
-			else
-				printf 'error\n'
-			fi
-			
-		done
-	fi
-}
-
 sync_file_in_dir(){
 	local param1=$1
 	local param2=$2
 	local mytemp="$memtemp_local"
-	local outputfile1_inremote="outputfile1_inremote.txt"
+	local outputfile_inremote="outputfile_inremote.txt"
 	local cmd
 	local findresult
 	local count
@@ -480,7 +244,7 @@ sync_file_in_dir(){
 	declare -a md5hash
 	declare -a mtime
 	
-	if [ -f "$mytemp"/"$outputfile1_inremote" ] ; then
+	if [ -f "$mytemp"/"$outputfile_inremote" ] ; then
 		count=0
 		while IFS=/ read beforeslash afterslash_1 afterslash_2 afterslash_3 afterslash_4 afterslash_5 afterslash_6
 		do
@@ -496,7 +260,7 @@ sync_file_in_dir(){
 			else
 				echo "--------------------file received valid---------------------"
 			fi
-		done < "$mytemp"/"$outputfile1_inremote"
+		done < "$mytemp"/"$outputfile_inremote"
 		
 		
 		count=0
@@ -516,6 +280,28 @@ sync_file_in_dir(){
 		done
 	fi
 }
+	
+
+copy_file_to_remote(){
+	local param1=$1
+	local param2=$2
+	local mycommand
+	local result
+	local cmd
+	local sshstring
+	sshstring="ssh -i ""$filepubkey"
+	
+	if [ -f "$param1" ] ; then
+		#rsync -vah --partial -e 'ssh -i '"$filepubkey"' "$param1"  "$destipv6addr_scp":"$param2"
+		#mycommand="rsync -vah --partial ""$param1"" ""$destipv6addr_scp"":""$param2""/"" -e 'ssh -i ""$filepubkey""'"
+		#mycommand="rsync -vah --partial ""$param1"" ""$param2""/"
+		rsync -vah --partial -e "ssh -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/ 
+		#echo "$mycommand"
+		#result=$(eval $mycommand)
+		cmd=$?
+	fi
+}
+
 
 main(){
 	local cmd
@@ -537,9 +323,11 @@ main(){
 		if [ "$cmd" -eq 1 ] && [ -f "$filepubkey" ] ; then
 			
 			#add to know_hosts for firsttime
-			mycommand="ssh -o StrictHostKeyChecking=no -i ""$filepubkey"" $destipv6addr ""'rm -r ""$memtemp_remote""; mkdir ""$memtemp_remote""'"
-			echo "$mycommand"
-			result=$(eval $mycommand)
+			ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm -r ${memtemp_remote}"
+			cmd=$?
+			myprintf "remove temp folder at remote" "$cmd"
+			
+			ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "mkdir ${memtemp_remote}"
 			cmd=$?
 			myprintf "mkdir temp at remote" "$cmd"
 
@@ -568,4 +356,4 @@ main(){
 #main
 find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
 sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
-
+#copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
