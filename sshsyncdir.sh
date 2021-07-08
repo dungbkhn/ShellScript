@@ -13,6 +13,12 @@ appdir_remote=/home/backup
 appdir_sha_remote="$appdir_remote"/sha256
 file_output_sha=outfile_sha256.txt
 
+appdir_sha_local="$appdir_local"/sha256
+gen256localfile=gen256hash_local.out
+gen256localCfile=gen256hash_local.c
+outfile_sha256_local=outfile_sha256_local.txt
+outfile_sha256_local_temp=outfile_sha256_local_temp.txt
+
 compare_listfile_inremote="comparelistfile_remote.sh"
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 memtemp_local="$appdir_local"/.temp
@@ -363,7 +369,31 @@ append_file_to_remote(){
 			if [ ! "$rsyncstring" ] ; then
 				echo 'rsync ok,lay shaoutput file success'
 				#gcc sha.out
+				echo "$appdir_sha_local"/"$gen256localfile"
+				if [ ! -f "$appdir_sha_local"/"$gen256localfile" ] ; then
+					cd "$appdir_sha_local"/
+					gcc sha256.c "$gen256localCfile" -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64 -o "$gen256localfile"
+				fi
+				echo "gen local sha256 file"
+				echo "$shalevel" > "$mytemp"/"$uploadfile"
+				echo "$shatruncnum" >> "$mytemp"/"$uploadfile"
+				echo "$param1" >> "$mytemp"/"$uploadfile"
+				#echo "./""$gen256localfile"" ""$mytemp""/""$uploadfile"" ""$mytemp""/""$outfile_sha256_local"" ""$mytemp""/""$outfile_sha256_local_temp"
+				cd "$appdir_sha_local"/
+				./"$gen256localfile" "$mytemp"/"$uploadfile" "$mytemp"/"$outfile_sha256_local" "$mytemp"/"$outfile_sha256_local_temp"
+
+				echo "cmp sha256 files"
 				#compare get diff line
+				result=$(cmp "$mytemp"/"$outfile_sha256_local" "$mytemp"/"$file_output_sha")
+				if [ ! "$result" ] ; then
+					echo 'hai file giong nhau'
+				else
+					echo "$result" | awk '{print $7}'
+					#result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${uploadfile}")
+					#cmd=$?
+					
+					#myprintf "ssh truncate" "$cmd"
+				fi
 				#ssh to struncate
 				#rsync
 			fi
@@ -434,7 +464,7 @@ main(){
 }
 
 #main
-find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
-sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
+#find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
+#sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
 #append_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
-#append_file_to_remote /home/dungnt/SharedFolder/Backup/Server_Billiards_TrongLV_20_3.rar /home/backup
+append_file_to_remote /home/dungnt/ShellScript/file_nhieu_mb.txt /home/backup/sosanh
