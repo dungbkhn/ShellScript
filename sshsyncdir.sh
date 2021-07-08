@@ -154,7 +154,6 @@ find_list_same_files () {
 	local listfiles="listfiles.txt"
 	local outputfile_inremote="outputfile_inremote.txt"
 	
-	
 	rm "$mytemp"/*
 
 	cd "$param1"/
@@ -177,47 +176,36 @@ find_list_same_files () {
 
 	cd "$workingdir"/
 	
-
-	
-	result=$(scp -i "$filepubkey" -p "$mytemp"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
+	result=$(scp -o StrictHostKeyChecking=no -i "$filepubkey" -p "$mytemp"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
 	#echo "$mycommand"
 	#result=$(eval $mycommand)
 	cmd1=$?
 	myprintf "scp 1 listfile" "$cmd1"
 	
-	
-		
-	result=$(scp -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+	result=$(scp -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
 	#echo "$mycommand"
 	#result=$(eval $mycommand)
 	cmd2=$?
 	myprintf "scp 2 listfile" "$cmd2"
 	
-	
-	
 	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] ; then
 
-		result=$(ssh -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
+		result=$(ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
 		cmd=$?
 		
 		myprintf "ssh remove outputfile" "$cmd"
 		
-		result=$(ssh -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/comparelistfile_remote.sh /${listfiles} ${param2} ${outputfile_inremote}")
+		result=$(ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/comparelistfile_remote.sh /${listfiles} ${param2} ${outputfile_inremote}")
 		cmd=$?
 		
 		myprintf "ssh gen outputfile" "$cmd"
 
 		rm "$mytemp"/"$listfiles"
 		
-		result=$(scp -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
-		#echo "$mycommand"
-		#result=$(eval $mycommand)
+		result=$(scp -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
 		cmd=$?
-		myprintf "scp getback listfile" "$cmd"
-
+		myprintf "scp getback outputfile" "$cmd"
 	fi
-	
-	
 }
 
 #------------------------------ COPY FILE --------------------------------
@@ -335,25 +323,27 @@ main(){
 			cmd=$?
 			myprintf "verify active user" "$cmd"
 			
+			break
+			
 			#if verifyresult: no active user -> sync_dir
 			if [ "$cmd" -gt 10 ] ; then
 				myecho "begin sync dir"
 				#sync_dir "$dir_ori" "$dir_dest"
 				echo "go to sleep 1"
-				sleep "$sleeptime"m
+				#sleep "$sleeptime"m
 			else
 				echo "go to sleep 2"
-				sleep "$sleeptime"m
+				#sleep "$sleeptime"m
 			fi
 		else
 			echo "go to sleep 00"
-			sleep "$sleeptime"m
+			#sleep "$sleeptime"m
 		fi
 	done
 	
 }
 
 #main
-find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
-sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
-#copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
+#find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
+#sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
+copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
