@@ -196,21 +196,18 @@ find_list_same_files () {
 			
 	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd2=$?
-	myprintf "scp 2 listfile" "$cmd2"
+	myprintf "scp 1 shellfile" "$cmd2"
 	
 	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
 	cmd3=$?
 	
-	myprintf "ssh remove outputfile" "$cmd3"
+	myprintf "ssh remove old outputfile" "$cmd3"
 		
 	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -eq 0 ] ; then
 
 		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listfile_inremote} /${listfiles} ${param2} ${outputfile_inremote}")
 		cmd=$?
-		
-		myprintf "ssh gen outputfile" "$cmd"
-
-		rm "$mytemp"/"$listfiles"
+		myprintf "ssh generate new outputfile" "$cmd"
 		
 		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
 		cmd=$?
@@ -290,14 +287,14 @@ sync_file_in_dir(){
 			
 		done
 		
-		echo "--------------------""$count"" files can append hoac compare ---------------------"
+		echo "--------------------""$count"" files can append hoac copy ---------------------"
 			
 	fi
 }
 	
 #------------------------------ COPY FILE --------------------------------
 
-copy_file_to_remote(){
+append_file_to_remote(){
 	local param1=$1
 	local param2=$2
 	local filename=$(basename "$param1")
@@ -439,5 +436,5 @@ main(){
 #main
 find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
 sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
-#copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
-#copy_file_to_remote /home/dungnt/SharedFolder/Backup/Server_Billiards_TrongLV_20_3.rar /home/backup
+#append_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
+#append_file_to_remote /home/dungnt/SharedFolder/Backup/Server_Billiards_TrongLV_20_3.rar /home/backup
