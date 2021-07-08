@@ -100,13 +100,13 @@ verify_logged() {
 	
 	if [ -f "$filepubkey" ] ; then
 	
-		result=$(ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "find ${logtimedir_remote} -maxdepth 1 -type f -name ${logtimefile}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "find ${logtimedir_remote} -maxdepth 1 -type f -name ${logtimefile}")
 		cmd=$?
 		echo "$result"
 		if [ "$cmd" -eq 0 ] && [ "$result" ] ; then
 				#echo 'tim thay' $logtimefile
 				
-				result=$(ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "tail ${logtimedir_remote}/${logtimefile}")
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "tail ${logtimedir_remote}/${logtimefile}")
 				cmd=$?
 				echo "$result"
 				if [ "$cmd" -eq 0 ] && [ "$result" ] ; then
@@ -176,33 +176,32 @@ find_list_same_files () {
 
 	cd "$workingdir"/
 	
-	result=$(scp -o StrictHostKeyChecking=no -i "$filepubkey" -p "$mytemp"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
-	#echo "$mycommand"
-	#result=$(eval $mycommand)
+	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$mytemp"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd1=$?
 	myprintf "scp 1 listfile" "$cmd1"
 	
-	result=$(scp -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
-	#echo "$mycommand"
-	#result=$(eval $mycommand)
+	#cmd=1:  copy fail - may be connection fail or no permission
+	#cmd=0:	 ok
+			
+	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd2=$?
 	myprintf "scp 2 listfile" "$cmd2"
 	
 	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] ; then
 
-		result=$(ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
 		cmd=$?
 		
 		myprintf "ssh remove outputfile" "$cmd"
 		
-		result=$(ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/comparelistfile_remote.sh /${listfiles} ${param2} ${outputfile_inremote}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/comparelistfile_remote.sh /${listfiles} ${param2} ${outputfile_inremote}")
 		cmd=$?
 		
 		myprintf "ssh gen outputfile" "$cmd"
 
 		rm "$mytemp"/"$listfiles"
 		
-		result=$(scp -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
+		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
 		cmd=$?
 		myprintf "scp getback outputfile" "$cmd"
 	fi
@@ -279,15 +278,13 @@ copy_file_to_remote(){
 	local sshstring
 	sshstring="ssh -i ""$filepubkey"
 	
-	if [ -f "$param1" ] ; then
-		#rsync -vah --partial -e 'ssh -i '"$filepubkey"' "$param1"  "$destipv6addr_scp":"$param2"
-		#mycommand="rsync -vah --partial ""$param1"" ""$destipv6addr_scp"":""$param2""/"" -e 'ssh -i ""$filepubkey""'"
-		#mycommand="rsync -vah --partial ""$param1"" ""$param2""/"
-		rsync -vah --partial -e "ssh -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/ 
-		#echo "$mycommand"
-		#result=$(eval $mycommand)
+	#if [ -f "$param1" ] ; then
+		result=$(rsync -vah --partial -e "ssh -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/)
 		cmd=$?
-	fi
+		echo "$?"
+
+	#fi
+	
 }
 
 
@@ -311,11 +308,14 @@ main(){
 		if [ "$cmd" -eq 1 ] && [ -f "$filepubkey" ] ; then
 			
 			#add to know_hosts for firsttime
-			ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm -r ${memtemp_remote}"
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm -r ${memtemp_remote}")
 			cmd=$?
 			myprintf "remove temp folder at remote" "$cmd"
+			#cmd=1:  run cmd fail at remote
+			#cmd=255: connection fail
+			#cmd=0:ok
 			
-			ssh -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "mkdir ${memtemp_remote}"
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "mkdir ${memtemp_remote}")
 			cmd=$?
 			myprintf "mkdir temp at remote" "$cmd"
 
@@ -344,6 +344,6 @@ main(){
 }
 
 #main
-#find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
-#sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
-copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
+find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
+sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
+#copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdfdgf" /home/backup/sosanh
