@@ -120,7 +120,7 @@ if [ -f "$memtemp""/""$param1" ] ; then
 
 	count=0
 	for i in "${!names[@]}" ; do
-		found=0
+
 		for j in "${!names_remote[@]}" ; do
 			#echo "herererererererererer-----""${names[$i]}""-------""${names_remote[$j]}"
 			if [ "${isfile[$i]}" == "f" ] && [ "${names[$i]}" == "${names_remote[$j]}" ] ; then
@@ -129,16 +129,19 @@ if [ -f "$memtemp""/""$param1" ] ; then
 					hassamefile_remote[$j]=1
 					if [ "${mtime[$i]}" == "${mtime_remote[$j]}" ] && [ "${filesize[$i]}" == "${filesize_remote[$j]}" ] && [ "${md5hash[$i]}" == "${md5hash_remote[$j]}" ] ; then
 						printf "./%s/1/%s/0/null/0\n" "${names[$i]}" "${names_remote[$j]}" >> "$memtemp""/""$param3"
+					elif [ "${filesize[$i]}" -lt "${filesize_remote[$j]}" ] ; then
+						rm "$param2""/""${names_remote[$j]}"
+						printf "./%s/5/null/0/null/0\n" "${names[$i]}" >> "$memtemp""/""$param3"
 					else
 						printf "./%s/0/%s/%s/%s/%s\n" "${names[$i]}" "${names_remote[$j]}" "${filesize_remote[$j]}" "${md5hash_remote[$j]}" "${mtime_remote[$j]}" >> "$memtemp""/""$param3"
 					fi
 					count=1
-					found=1
+
 					break
 			fi
 		done
 
-		#if [ "$found" -eq 1 ] ; then
+		#if [ "$count" -eq 1 ] ; then
 		#	echo "found"
 		#fi
 		
@@ -193,9 +196,10 @@ if [ -f "$memtemp""/""$param1" ] ; then
 			fi
 		done
 		
-		#if [ "$count" -eq 0 ] ; then
-		#	echo 'do some thing'
-		#fi
+		if [ "$count" -eq 0 ] ; then
+			#echo 'do some thing'
+			printf "./%s/4/null/0/null/0\n" "${names_nt[$i]}" >> "$memtemp""/""$param3"
+		fi
 		
 	done
 
