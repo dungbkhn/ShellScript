@@ -10,6 +10,9 @@ dir_dest=/home/backup/storageBackup
 appdir_local=/home/dungnt/ShellScript/sshsyncapp
 appdir_remote=/home/backup
 
+appdir_sha_remote="$appdir_remote"/sha256
+file_output_sha=outfile_sha256.txt
+
 compare_listfile_inremote="comparelistfile_remote.sh"
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 memtemp_local="$appdir_local"/.temp
@@ -29,7 +32,13 @@ prt=1
 #for COMPARE
 copyfilesize="10MB"
 truncsize=10000000
-
+#for SHA
+#//1024*1024 for filesize < 16 M = 16777216
+MYSIZE_L1=1048576 
+#//16*1024*1024 for filesize < 256 M = 268435456
+MYSIZE_L2=16777216 
+# //256*1024*1024 others
+MYSIZE_L3 268435456
 
 #----------------------------------------TOOLS-------------------------------------
 
@@ -275,15 +284,24 @@ copy_file_to_remote(){
 	local mycommand
 	local result
 	local cmd
-	local sshstring
-	sshstring="ssh -i ""$filepubkey"
+	local rsyncstring
 	
-	#if [ -f "$param1" ] ; then
-		result=$(rsync -vah --partial -e "ssh -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/)
-		cmd=$?
-		echo "$?"
+	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${file_output_sha}")
+	cmd=$?
+	
+	myprintf "ssh remove file_output_sha" "$cmd"
+		
+	if [ -f "$param1" ] ; then
+		result=$(rsync -vah --partial -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/ 2>&1)
+		#cmd=$?-->rsync ko phan hoi
 
-	#fi
+		rsyncstring=$(echo "$result" | grep 'error')
+		if [ ! "$rsyncstring" ] ; then
+			echo 'rsync ok'
+		else
+			echo 'rsync error'
+		fi
+	fi
 	
 }
 
@@ -344,6 +362,6 @@ main(){
 }
 
 #main
-find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
-sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
-#copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdfdgf" /home/backup/sosanh
+#find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
+#sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
+copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
