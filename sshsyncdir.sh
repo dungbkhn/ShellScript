@@ -23,8 +23,9 @@ destipv6addr_scp="backup@[]"
 filepubkey=/home/dungnt/.ssh/id_rsa_backup_58
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
 logtimefile=logtimefile.txt
+outputfileforcmp_inremote=outputfile_inremote.txt
+uploadlistfile=listfile.txt
 
-find_list_same_files_recv="find_list_same_files_recv.txt"
 
 sleeptime=5
 #for PRINTING
@@ -38,7 +39,7 @@ MYSIZE_L1=1048576
 #//16*1024*1024 for filesize < 256 M = 268435456
 MYSIZE_L2=16777216 
 # //256*1024*1024 others
-MYSIZE_L3 268435456
+MYSIZE_L3=268435456
 
 #----------------------------------------TOOLS-------------------------------------
 
@@ -160,8 +161,8 @@ find_list_same_files () {
 	local md5hash
 	local mtime
 	local mtime_temp
-	local listfiles="listfiles.txt"
-	local outputfile_inremote="outputfile_inremote.txt"
+	local listfiles="listfilesforcmp.txt"
+	local outputfile_inremote="$outputfileforcmp_inremote"
 	
 	rm "$mytemp"/*
 
@@ -216,13 +217,12 @@ find_list_same_files () {
 	fi
 }
 
-#------------------------------ COPY FILE --------------------------------
 
 sync_file_in_dir(){
 	local param1=$1
 	local param2=$2
 	local mytemp="$memtemp_local"
-	local outputfile_inremote="outputfile_inremote.txt"
+	local outputfile_inremote="$outputfileforcmp_inremote"
 	local cmd
 	local findresult
 	local count
@@ -277,30 +277,83 @@ sync_file_in_dir(){
 	fi
 }
 	
+#------------------------------ COPY FILE --------------------------------
 
 copy_file_to_remote(){
 	local param1=$1
 	local param2=$2
+	local filename=$(basename "$param1")
+	local mytemp="$memtemp_local"
 	local mycommand
 	local result
 	local cmd
+	local cmd1
+	local cmd2
 	local rsyncstring
+	local filesize
+	local shasize
+	local shatruncnum
+	local shatruncnum_modulo
+	local shalevel
+	local uploadfile="$uploadlistfile"
 	
 	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${file_output_sha}")
-	cmd=$?
+	cmd1=$?
 	
-	myprintf "ssh remove file_output_sha" "$cmd"
+	myprintf "ssh remove file_output_sha" "$cmd1"
+	
+	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${uploadfile}")
+	cmd2=$?
+	
+	myprintf "ssh remove old upload shafile" "$cmd2"
+	
+	if [ "$cmd1" != 255 ] && [ "$cmd2" != 255 ] && [ -f "$param1" ] ; then
+	
+		filesize=$(wc -c "$param1" | awk '{print $1}')
+	
+		if [ "$filesize" -lt "$MYSIZE_L2" ] ; then
+			shasize="$MYSIZE_L1"
+			shalevel=1
+		elif [ "$filesize" -lt "$MYSIZE_L3" ] ; then
+			shasize="$MYSIZE_L2"
+			shalevel=2
+		else
+			shasize="$MYSIZE_L3"
+			shalevel=3
+		fi
 		
-	if [ -f "$param1" ] ; then
-		result=$(rsync -vah --partial -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/ 2>&1)
+
+		shatruncnum=$(($filesize / $shasize))
+		shatruncnum_modulo=$(($filesize % $shasize))
+		
+		if [ "$shatruncnum_modulo" -ne 0 ] ; then
+			shatruncnum=$(($shatruncnum + 1))
+		fi
+		
+		echo "shatruncnum:""$shatruncnum"
+		
+		echo "$shalevel" > "$mytemp"/"$uploadfile"
+		echo "$shatruncnum" >> "$mytemp"/"$uploadfile"
+		echo "$param2"/"$filename" >> "$mytemp"/"$uploadfile"
+		
+		result=$(rsync -vah --partial -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$mytemp"/"$uploadfile" "$destipv6addr_scp":"$appdir_sha_remote"/ 2>&1)
 		#cmd=$?-->rsync ko phan hoi
 
 		rsyncstring=$(echo "$result" | grep 'error')
 		if [ ! "$rsyncstring" ] ; then
 			echo 'rsync ok'
+			sleep 60
+			result=$(rsync -vah --inplace -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$destipv6addr_scp":"$appdir_sha_remote"/"$file_output_sha" "$mytemp"/ 2>&1)
+			rsyncstring=$(echo "$result" | grep 'error')
+			if [ ! "$rsyncstring" ] ; then
+				echo 'rsync ok,lay shaoutput file success'
+			fi
 		else
 			echo 'rsync error'
 		fi
+	else
+		echo 'big error'
+		
 	fi
 	
 }
@@ -364,4 +417,5 @@ main(){
 #main
 #find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
 #sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
-copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
+#copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
+copy_file_to_remote /home/dungnt/SharedFolder/Backup/Server_Billiards_TrongLV_20_3.rar /home/backup
