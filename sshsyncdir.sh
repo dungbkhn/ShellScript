@@ -154,6 +154,7 @@ find_list_same_files () {
 	local cmd
 	local cmd1
 	local cmd2
+	local cmd3
 	local result
 	local mycommand
 	local pathname
@@ -197,14 +198,14 @@ find_list_same_files () {
 	cmd2=$?
 	myprintf "scp 2 listfile" "$cmd2"
 	
-	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] ; then
+	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
+	cmd3=$?
+	
+	myprintf "ssh remove outputfile" "$cmd3"
+		
+	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -eq 0 ] ; then
 
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
-		cmd=$?
-		
-		myprintf "ssh remove outputfile" "$cmd"
-		
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/comparelistfile_remote.sh /${listfiles} ${param2} ${outputfile_inremote}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listfile_inremote} /${listfiles} ${param2} ${outputfile_inremote}")
 		cmd=$?
 		
 		myprintf "ssh gen outputfile" "$cmd"
@@ -226,6 +227,7 @@ sync_file_in_dir(){
 	local cmd
 	local findresult
 	local count
+	local total
 	local beforeslash
 	local afterslash_1
 	local afterslash_2
@@ -242,6 +244,7 @@ sync_file_in_dir(){
 	
 	if [ -f "$mytemp"/"$outputfile_inremote" ] ; then
 		count=0
+		total=0
 		while IFS=/ read beforeslash afterslash_1 afterslash_2 afterslash_3 afterslash_4 afterslash_5 afterslash_6
 		do
 			if [ "$afterslash_1" != "" ] ; then
@@ -250,11 +253,22 @@ sync_file_in_dir(){
 					size[$count]="$afterslash_4"
 					md5hash[$count]="$afterslash_5"
 					mtime[$count]="$afterslash_6"
-					echo "${name[$count]}""-----""${size[$count]}""-----""${md5hash[$count]}""-----""${mtime[$count]}"
+					echo "needappend:""${name[$count]}""-----""${size[$count]}""-----""${md5hash[$count]}""-----""${mtime[$count]}"
+					count=$(($count + 1))
+				elif [ "$afterslash_2" -eq 4 ] || [ "$afterslash_2" -eq 5 ] ; then
+					name[$count]="$afterslash_1"
+					size[$count]="$afterslash_4"
+					md5hash[$count]="$afterslash_5"
+					mtime[$count]="$afterslash_6"
+					echo "needcopy:""${name[$count]}""-----""${size[$count]}""-----""${md5hash[$count]}""-----""${mtime[$count]}"
 					count=$(($count + 1))
 				fi
+				
+				if [ "$afterslash_2" -ne 3 ] ; then
+					total=$(($total + 1))
+				fi
 			else
-				echo "--------------------file received valid---------------------"
+				echo "--------------------""$total"" files received valid---------------------"
 			fi
 		done < "$mytemp"/"$outputfile_inremote"
 		
@@ -268,12 +282,16 @@ sync_file_in_dir(){
 			#neu tim thay
 			if [ "$cmd" -eq 0 ] && [ "$findresult" ] ; then
 				echo "nhung file giong ten nhung khac attribute:""$findresult"
+				count=$(($count + 1))
 			#neu ko tim thay
 			else
 				printf 'error\n'
 			fi
 			
 		done
+		
+		echo "--------------------""$count"" files can append hoac compare ---------------------"
+			
 	fi
 }
 	
@@ -347,6 +365,10 @@ copy_file_to_remote(){
 			rsyncstring=$(echo "$result" | grep 'error')
 			if [ ! "$rsyncstring" ] ; then
 				echo 'rsync ok,lay shaoutput file success'
+				#gcc sha.out
+				#compare get diff line
+				#ssh to struncate
+				#rsync
 			fi
 		else
 			echo 'rsync error'
@@ -415,7 +437,7 @@ main(){
 }
 
 #main
-#find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
-#sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
+find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
+sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
 #copy_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
-copy_file_to_remote /home/dungnt/SharedFolder/Backup/Server_Billiards_TrongLV_20_3.rar /home/backup
+#copy_file_to_remote /home/dungnt/SharedFolder/Backup/Server_Billiards_TrongLV_20_3.rar /home/backup
