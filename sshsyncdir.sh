@@ -358,15 +358,15 @@ append_file_to_remote(){
 		echo "$param2"/"$filename" >> "$mytemp"/"$uploadfile"
 		
 		result=$(rsync -vah --partial -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$mytemp"/"$uploadfile" "$destipv6addr_scp":"$appdir_sha_remote"/ 2>&1)
-		#cmd=$?-->rsync ko phan hoi
+		cmd=$?
 
-		rsyncstring=$(echo "$result" | grep 'error')
-		if [ ! "$rsyncstring" ] ; then
+		#rsyncstring=$(echo "$result" | grep 'error')
+		if [ "$cmd" -eq 0 ] ; then
 			echo 'rsync ok'
 			sleep 60
 			result=$(rsync -vah --inplace -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$destipv6addr_scp":"$appdir_sha_remote"/"$file_output_sha" "$mytemp"/ 2>&1)
-			rsyncstring=$(echo "$result" | grep 'error')
-			if [ ! "$rsyncstring" ] ; then
+			cmd=$?
+			if [ "$cmd" -eq 0 ] ; then
 				echo 'rsync ok,lay shaoutput file success'
 				#gcc sha.out
 				echo "$appdir_sha_local"/"$gen256localfile"
@@ -388,14 +388,16 @@ append_file_to_remote(){
 				if [ ! "$result" ] ; then
 					echo 'hai file giong nhau'
 				else
-					echo "$result" | awk '{print $7}'
-					#result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${uploadfile}")
-					#cmd=$?
-					
-					#myprintf "ssh truncate" "$cmd"
+					shatruncnum=$(echo "$result" | awk '{print $7}')
+					filesize=$(($shasize * ($shatruncnum - 1)))
+					echo "size shrink:""$filesize"
+					result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "truncate -s ${filesize} ${param2}/${filename}")
+					cmd=$?
+					myprintf "ssh truncate" "$cmd"
+					result=$(rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/"$filename" 2>&1)
 				fi
-				#ssh to struncate
-				#rsync
+			else
+				echo 'rsync fail,lay shaoutput file fail'
 			fi
 		else
 			echo 'rsync error'
