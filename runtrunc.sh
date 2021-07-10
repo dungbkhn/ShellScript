@@ -3,12 +3,17 @@
 shopt -s dotglob
 shopt -s nullglob
 
-#dir_dest=/home/backup/trunc
-dir_dest=/home/dungnt/ShellScript/sshsyncapp/trunc
+#dir_contain_shell_file=/home/backup/trunc
+dir_dest=/home/backup/.temp
+#dir_dest=/home/dungnt/ShellScript/sshsyncapp/.temp
 input_file=truncatefile_inremote.txt
 
 filename="/"
 truncsize=0
+
+if [ ! -f "$dir_dest"/"$input_file" ] ; then
+	exit 1
+fi
 
 c=0
 while IFS=/ read beforeslash 
