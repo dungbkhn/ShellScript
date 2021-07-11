@@ -16,7 +16,7 @@ sleep 60
 
 
 if [ ! -f "$dirgenC"/"$fileoutgen" ] ; then
-	gcc "$dirgenC"/"$filegenC" "$dirgenC"/"$shaC" -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64 -o "$dirgenC"/"$fileoutgen"
+	gcc "$dirgenC"/"$filegenC" -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64 -o "$dirgenC"/"$fileoutgen"
 fi
 
 
