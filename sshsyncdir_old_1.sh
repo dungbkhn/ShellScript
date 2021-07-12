@@ -32,8 +32,8 @@ outfile_sha256_local_temp=outfile_sha256_local_temp.txt
 compare_listfile_inremote=comparelistfile_remote.sh
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 
-destipv6addr="backup@2405:4803:fe18:bc50::e"
-destipv6addr_scp="backup@[2405:4803:fe18:bc50::e]"
+destipv6addr="backup@"
+destipv6addr_scp="backup@[]"
 
 filepubkey=/home/dungnt/.ssh/id_rsa_backup_58
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
