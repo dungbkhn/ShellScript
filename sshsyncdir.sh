@@ -10,19 +10,28 @@ dir_dest=/home/backup/storageBackup
 appdir_local=/home/dungnt/ShellScript/sshsyncapp
 appdir_remote=/home/backup
 
+memtemp_local="$appdir_local"/.temp
+memtemp_remote="$appdir_remote"/.temp
+
 appdir_sha_remote="$appdir_remote"/sha256
 file_output_sha=outfile_sha256.txt
+file_output_sha_temp=outfile_sha256_temp.txt
+truncatefile_inremote=truncatefile_inremote.txt
+
+appdir_trunc_remote="$appdir_remote"/trunc
+truncateshellfile=runtrunc.sh
 
 appdir_sha_local="$appdir_local"/sha256
+gen256remoteprocess=gen256hash.out
 gen256localfile=gen256hash_local.out
 gen256localCfile=gen256hash_local.c
+sha256localCfile=sha256.c
 outfile_sha256_local=outfile_sha256_local.txt
 outfile_sha256_local_temp=outfile_sha256_local_temp.txt
 
-compare_listfile_inremote="comparelistfile_remote.sh"
+compare_listfile_inremote=comparelistfile_remote.sh
 dir_contains_uploadfiles="$appdir_local"/remotefiles
-memtemp_local="$appdir_local"/.temp
-memtemp_remote="$appdir_remote"/.temp
+
 destipv6addr="backup@"
 destipv6addr_scp="backup@[]"
 
@@ -116,16 +125,13 @@ verify_logged() {
 	
 	if [ -f "$filepubkey" ] ; then
 	
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "find ${logtimedir_remote} -maxdepth 1 -type f -name ${logtimefile}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "tail ${logtimedir_remote}/${logtimefile}")
 		cmd=$?
 		echo "$result"
-		if [ "$cmd" -eq 0 ] && [ "$result" ] ; then
+		
+		if [ "$cmd" -eq 0 ] ; then
 				#echo 'tim thay' $logtimefile
-				
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "tail ${logtimedir_remote}/${logtimefile}")
-				cmd=$?
-				echo "$result"
-				if [ "$cmd" -eq 0 ] && [ "$result" ] ; then
+				if [ "$result" ] ; then
 					curtime=$(($(date +%s%N)/1000000))
 					#printf 'curtime:%s\n' "$curtime"
 					value=$(echo "${result##*$'\n'}")
@@ -170,6 +176,7 @@ find_list_same_files () {
 	local mtime_temp
 	local listfiles="listfilesforcmp.txt"
 	local outputfile_inremote="$outputfileforcmp_inremote"
+	local loopforcount
 	
 	rm "$mytemp"/*
 
@@ -177,15 +184,17 @@ find_list_same_files () {
 	
 	touch "$mytemp"/"$listfiles"
 	
+	#ERROR: co the co loi khi file vua bi xoa truoc khi lay filezise....
+	#giai quyet: lay filesize cuoi cung, neu =0 --> bi xoa roi
 	for pathname in ./* ;do
 		if [ -d "$pathname" ] ; then 
 			printf "%s/%s/0/0/0\n" "$pathname" "d" >> "$mytemp"/"$listfiles"
 		else
-			filesize=$(wc -c "$pathname" | awk '{print $1}')
 			md5hash=$(head -c 1024 "$pathname" | md5sum | awk '{ print $1 }')
 			#md5tailhash=$(get_src_content_file_md5sum "$pathname")
 			mtime_temp=$(stat "$pathname" --printf='%y\n')
 			mtime=$(date +'%s' -d "$mtime_temp")
+			filesize=$(wc -c "$pathname" | awk '{print $1}')
 			#printf "%s/%s/%s/%s/%s/%s\n" "$pathname" "f" "$filesize" "$md5hash" "$md5tailhash" "$mtime" >> "$mytemp"/"$listfiles"
 			printf "%s/%s/%s/%s/%s\n" "$pathname" "f" "$filesize" "$md5hash" "$mtime" >> "$mytemp"/"$listfiles"
 		fi
@@ -196,28 +205,34 @@ find_list_same_files () {
 	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$mytemp"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd1=$?
 	myprintf "scp 1 listfile" "$cmd1"
-	
-	#cmd=1:  copy fail - may be connection fail or no permission
-	#cmd=0:	 ok
 			
 	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd2=$?
 	myprintf "scp 1 shellfile" "$cmd2"
-	
+
 	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
 	cmd3=$?
 	
 	myprintf "ssh remove old outputfile" "$cmd3"
 		
-	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -eq 0 ] ; then
-
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listfile_inremote} /${listfiles} ${param2} ${outputfile_inremote}")
-		cmd=$?
-		myprintf "ssh generate new outputfile" "$cmd"
+	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -ne 255 ] ; then
+		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+		do
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listfile_inremote} /${listfiles} ${param2} ${outputfile_inremote}")
+			cmd=$?
+			myprintf "ssh generate new outputfile" "$cmd"
+			if [ "$cmd" -eq 0 ] ; then
+				break
+			else
+				sleep 1
+			fi
+		done
 		
-		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
-		cmd=$?
-		myprintf "scp getback outputfile" "$cmd"
+		if [ "$cmd" -eq 0 ] ; then
+			result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
+			cmd=$?
+			myprintf "scp getback outputfile" "$cmd"
+		fi
 	fi
 }
 
@@ -298,9 +313,59 @@ sync_file_in_dir(){
 	fi
 }
 	
-#------------------------------ COPY FILE --------------------------------
+#------------------------------ APPEND FILE --------------------------------
 
-append_file_to_remote(){
+append_native(){
+	local param1=$1
+	local param2=$2
+	local param3=$3
+	local param4=$4
+	local result
+	local cmd
+	local cmd1
+	local cmd2
+	local loopforcount
+	
+	while true; do
+		echo 'begin append 2m'
+		rsync -vah --append --time-limit=2 -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1" "$param2":"$param3"/"$param4"
+		cmd=$?
+		if [ "$cmd" -eq 0 ] ; then
+			echo 'append ends successfully'
+			return 1
+		elif [ "$cmd" -eq 30 ] ; then
+			for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+			do		
+				#vuot timeout
+				if [ "$loopforcount" -eq 20 ] ;  then
+					echo 'append timeout, nghi dai'
+					return 0
+				fi
+			
+				verify_logged
+				cmd1=$?
+				myprintf "verify active user" "$cmd1"
+			
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i /home/dungnt/.ssh/id_rsa_backup_58 backup@192.168.1.58 "netstat -atn 2>&1 | grep ':22 ' 2>&1 | grep 'ESTABLISHED' | wc -l")
+				cmd2=$?
+				myprintf "run countsshuser" "$cmd2"
+				myprintf "num sshuser" "$result"
+				
+				if [ "$cmd1" -eq 1 ] && [ "$cmd2" -ne 255 ] && [ "$result" -lt 2 ] ; then
+					#thoat vong lap for
+					break
+				else
+					sleep 15			
+				fi	
+			done
+		else
+			echo 'nghi dai ko ro loi cua rcync '"$cmd"
+			return 0
+		fi
+	done
+}
+
+append_with_hash_checking(){
 	local param1=$1
 	local param2=$2
 	local filename=$(basename "$param1")
@@ -310,6 +375,7 @@ append_file_to_remote(){
 	local cmd
 	local cmd1
 	local cmd2
+	local cmd3
 	local rsyncstring
 	local filesize
 	local shasize
@@ -317,21 +383,49 @@ append_file_to_remote(){
 	local shatruncnum_modulo
 	local shalevel
 	local uploadfile="$uploadlistfile"
+	local count
+	local loopforcount
+	local shatempsize
 	
-	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${file_output_sha}")
-	cmd1=$?
+	cmd1=255
+	cmd2=255
+	cmd3=255
+	count=0
 	
-	myprintf "ssh remove file_output_sha" "$cmd1"
+	#thu ket noi mang
+	while [ "$cmd1" -eq 255 ] || [ "$cmd2" -eq 255 ] || [ "$cmd3" -eq 255 ] ; do
+		
+		sleep 1
+		
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${file_output_sha}")
+		cmd1=$?
+		
+		myprintf "ssh remove file_output_sha" "$cmd1"
+		
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${file_output_sha_temp}")
+		cmd2=$?
+		
+		myprintf "ssh remove file_output_sha_temp" "$cmd2"
+		
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${uploadfile}")
+		cmd3=$?
+		
+		myprintf "ssh remove old upload shafile" "$cmd3"
+		
+		count=$(($count + 1))
+
+		if [ "$count" -eq 10 ] ; then
+			echo 'ko the ket noi, nghi dai'
+			return
+		fi
+		
+	done
 	
-	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${appdir_sha_remote}/${uploadfile}")
-	cmd2=$?
+	#ERROR: co the co loi khi file vua bi xoa truoc khi lay filezise....
+	filesize=$(wc -c "$param1" | awk '{print $1}')
 	
-	myprintf "ssh remove old upload shafile" "$cmd2"
-	
-	if [ "$cmd1" != 255 ] && [ "$cmd2" != 255 ] && [ -f "$param1" ] ; then
-	
-		filesize=$(wc -c "$param1" | awk '{print $1}')
-	
+	if [ -f "$param1" ] && [ "$filesize" -gt 0 ] ; then
+						
 		if [ "$filesize" -lt "$MYSIZE_L2" ] ; then
 			shasize="$MYSIZE_L1"
 			shalevel=1
@@ -343,7 +437,8 @@ append_file_to_remote(){
 			shalevel=3
 		fi
 		
-
+		echo 'filesize'"$filesize"
+		echo 'level'"$shalevel"
 		shatruncnum=$(($filesize / $shasize))
 		shatruncnum_modulo=$(($filesize % $shasize))
 		
@@ -357,54 +452,218 @@ append_file_to_remote(){
 		echo "$shatruncnum" >> "$mytemp"/"$uploadfile"
 		echo "$param2"/"$filename" >> "$mytemp"/"$uploadfile"
 		
-		result=$(rsync -vah --partial -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$mytemp"/"$uploadfile" "$destipv6addr_scp":"$appdir_sha_remote"/ 2>&1)
-		cmd=$?
-
-		#rsyncstring=$(echo "$result" | grep 'error')
-		if [ "$cmd" -eq 0 ] ; then
-			echo 'rsync ok'
-			sleep 60
-			result=$(rsync -vah --inplace -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$destipv6addr_scp":"$appdir_sha_remote"/"$file_output_sha" "$mytemp"/ 2>&1)
+		cmd=1
+		count=0
+		
+		while [ "$cmd" -ne 0 ] ; do
+			if [ "$count" -eq 8 ] ; then
+				echo 'rsync error, ko the up truncatefile len remote, nghi dai'
+				return
+			fi
+			
+			sleep 1
+			rsync -vah --partial -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$mytemp"/"$uploadfile" "$destipv6addr_scp":"$appdir_sha_remote"/ 
+			cmd=$?
+			
+			count=$(($count + 1))
+		done
+		
+		echo 'up truncatefile len remote ok'
+		
+		###############################################################3
+		#kiem tra q/tr generate sha256file o phia remote
+		count=0
+		shatempsize=0
+		while true ; do
+			if [ "$count" -eq 7 ] ; then
+				echo 'kiem tra tempfile qua timeout, nghi dai'
+				return
+			fi
+			
+			#trung binh gen256sha process ngu dai nhat 10s trong dk binh thuong
+			sleep 10
+			
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "find ${appdir_sha_remote} -maxdepth 1 -type f -name ${file_output_sha_temp}")
+			cmd=$?
+			
+			#ko loi thuc thi ssh
+			if [ "$cmd" -eq 0 ] ; then
+				#tim thay tempfile
+				echo "timthaytempfile ko?:""$result"
+				if [ "$result" ] ; then
+					#tinh kich thuoc shatempsize, save vao shatempsize
+					#thu 20 lan truoc khi ko the lay kichthuoc shatempsize
+					for (( loopforcount=0; loopforcount<=20; loopforcount+=1 ));
+					do
+						sleep 2
+						
+						result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "pidof ${gen256remoteprocess}")
+						cmd1=$?
+						if [ "$cmd1" -eq 0 ] && [ ! "$result" ] ; then
+							echo "cmd1: ""$cmd1"" result: ""$result"' process dung bat thuong, nghi dai 0'
+							return
+						fi
+						
+						result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "wc -c ${appdir_sha_remote}/${file_output_sha_temp}")
+						cmd=$?
+						
+						#neu chay ssh thanh cong
+						if [ "$cmd1" -eq 0 ] && [ "$cmd" -ne 255 ] ; then
+							#thoat vong lap for
+							break
+						else
+							sleep 13
+						fi
+					done
+					
+					#lay duoc kich thuoc file,=0 cung ko sao vi cpu nang se ko update file size
+					if [ "$cmd" -eq 0 ] ; then
+						echo 'gan lai count'
+						count=0
+					#ko lay duoc kich thuoc file
+					#outputfiletemp mat--->outputsha da sinh ra
+					#hoac process nghi 45s hoac process chet
+					else						
+						#kiem tra da sinh output 256sha chua
+						for (( loopforcount=0; loopforcount<=20; loopforcount+=1 ));
+						do
+							sleep 2
+							result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "find ${appdir_sha_remote} -maxdepth 1 -type f -name ${file_output_sha}")
+							cmd=$?
+							#neu chay ssh thanh cong
+							if [ "$cmd" -eq 0 ] ; then
+								#thoat vong lap for
+								break
+							else
+								sleep 13
+							fi
+						done
+						echo 'mat temp file dot ngot hoac shagen da sinh ra:'"$result"
+						#neu shafile generated
+						if [ "$cmd" -eq 0 ] && [ "$result" ] ; then
+							#thoat vong lap while
+							echo 'file sha generated roi do 1'
+							break
+						#neu process stopped
+						else
+							echo 'process stopped 45s, nghi dai 2'
+							return
+						fi
+					fi
+				#ko tim thay tempfile
+				else
+					#co 2 TH:1.process gen sha stopped; 2. shafile generated
+					for (( loopforcount=0; loopforcount<=20; loopforcount+=1 ));
+					do
+						sleep 2
+						result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "find ${appdir_sha_remote} -maxdepth 1 -type f -name ${file_output_sha}")
+						cmd=$?
+						#neu chay ssh thanh cong
+						if [ "$cmd" -eq 0 ] ; then
+							#thoat vong lap for
+							break
+						else
+							sleep 13
+						fi
+					done
+					
+					#neu shafile generated
+					if [ "$cmd" -eq 0 ] && [ "$result" ] ; then
+						#thoat vong lap while
+						echo 'file sha generated ngay tu dau'
+						break
+					#neu process stopped
+					else
+						echo 'process stopped in 45s, nghi dai'
+						return
+					fi
+				fi
+			#loi thuc thi ssh, thu tiep vai lan
+			else
+				echo 'loi thuc thi ssh'
+				count=$(($count + 1))
+			fi
+		done
+		
+		###############################################################
+		
+		for (( loopforcount=0; loopforcount<=20; loopforcount+=1 ));
+		do
+			rsync -vah --inplace -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$destipv6addr_scp":"$appdir_sha_remote"/"$file_output_sha" "$mytemp"/ 
 			cmd=$?
 			if [ "$cmd" -eq 0 ] ; then
-				echo 'rsync ok,lay shaoutput file success'
-				#gcc sha.out
-				echo "$appdir_sha_local"/"$gen256localfile"
-				if [ ! -f "$appdir_sha_local"/"$gen256localfile" ] ; then
-					cd "$appdir_sha_local"/
-					gcc sha256.c "$gen256localCfile" -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64 -o "$gen256localfile"
-				fi
-				echo "gen local sha256 file"
-				echo "$shalevel" > "$mytemp"/"$uploadfile"
-				echo "$shatruncnum" >> "$mytemp"/"$uploadfile"
-				echo "$param1" >> "$mytemp"/"$uploadfile"
-				#echo "./""$gen256localfile"" ""$mytemp""/""$uploadfile"" ""$mytemp""/""$outfile_sha256_local"" ""$mytemp""/""$outfile_sha256_local_temp"
+				break
+			else
+				sleep 15
+			fi
+		done
+		
+		filesize=$(wc -c "$mytemp"/"$file_output_sha" | awk '{print $1}')
+		
+		#lay sha256outputfile thanh cong va ko chua xau ######
+		if [ "$cmd" -eq 0 ] && [ "$filesize" -gt 20 ] ; then
+			echo 'rsync ok,lay shaoutput file success'
+			#gcc sha.out
+			echo "$appdir_sha_local"/"$gen256localfile"
+			if [ ! -f "$appdir_sha_local"/"$gen256localfile" ] ; then
 				cd "$appdir_sha_local"/
-				./"$gen256localfile" "$mytemp"/"$uploadfile" "$mytemp"/"$outfile_sha256_local" "$mytemp"/"$outfile_sha256_local_temp"
+				gcc "$gen256localCfile" "$sha256localCfile" -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64 -o "$gen256localfile"
+				if [ "$?" -ne 0 ] ; then
+					echo 'loi bien dich gcc, nghi dai'
+					return
+				fi
+			fi
+			echo "gen local sha256 file"
+			echo "$shalevel" > "$mytemp"/"$uploadfile"
+			echo "$shatruncnum" >> "$mytemp"/"$uploadfile"
+			echo "$param1" >> "$mytemp"/"$uploadfile"
+			#echo "./""$gen256localfile"" ""$mytemp""/""$uploadfile"" ""$mytemp""/""$outfile_sha256_local"" ""$mytemp""/""$outfile_sha256_local_temp"
+			cd "$appdir_sha_local"/
+			./"$gen256localfile" "$mytemp"/"$uploadfile" "$mytemp"/"$outfile_sha256_local" "$mytemp"/"$outfile_sha256_local_temp"
 
-				echo "cmp sha256 files"
-				#compare get diff line
-				result=$(cmp "$mytemp"/"$outfile_sha256_local" "$mytemp"/"$file_output_sha")
-				if [ ! "$result" ] ; then
-					echo 'hai file giong nhau'
+			echo "cmp sha256 files"
+			#compare get diff line
+			result=$(cmp "$mytemp"/"$outfile_sha256_local" "$mytemp"/"$file_output_sha")
+			cmd=$?
+			if [ "$cmd" -eq 0 ] ; then
+				echo 'hai file giong nhau'
+			elif [ "$cmd" -eq 1 ] ; then
+				shatruncnum=$(echo "$result" | awk '{print $7}')
+				filesize=$(($shasize * ($shatruncnum - 1)))
+				echo "size shrink:""$filesize"
+				
+				for (( loopforcount=0; loopforcount<=20; loopforcount+=1 ));
+				do
+					echo "$filesize" > "$mytemp"/"$truncatefile_inremote"
+					echo "$param2"/"$filename" >> "$mytemp"/"$truncatefile_inremote"
+					rsync -vah --inplace -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$mytemp"/"$truncatefile_inremote" "$destipv6addr_scp":"$memtemp_remote"/ 
+					cmd1=$?
+					rsync -vah --inplace -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir_contains_uploadfiles"/"$truncateshellfile" "$destipv6addr_scp":"$appdir_trunc_remote"/ 
+					cmd2=$?
+					ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${appdir_trunc_remote}/${truncateshellfile} ${memtemp_remote}/${truncatefile_inremote}"
+					cmd3=$?
+					
+					if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -eq 0 ] ; then
+						break
+					else
+						sleep 15
+					fi
+				done
+				
+				if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -eq 0 ] ; then
+					#result=$(rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/"$filename" )
+					append_native "$param1" "$destipv6addr_scp" "$param2" "$filename"
 				else
-					shatruncnum=$(echo "$result" | awk '{print $7}')
-					filesize=$(($shasize * ($shatruncnum - 1)))
-					echo "size shrink:""$filesize"
-					result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "truncate -s ${filesize} ${param2}/${filename}")
-					cmd=$?
-					myprintf "ssh truncate" "$cmd"
-					result=$(rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1" "$destipv6addr_scp":"$param2"/"$filename" 2>&1)
+					echo 'ssh fail, truncate error, nghi dai'
 				fi
 			else
-				echo 'rsync fail,lay shaoutput file fail'
+				echo 'cmp fail, nghi dai'
 			fi
 		else
-			echo 'rsync error'
+			echo 'rsync fail,lay shaoutput file fail,or output chua ######, nghi dai'
 		fi
 	else
-		echo 'big error'
-		
+		echo 'big error,ko thay file, nghi dai'
 	fi
 	
 }
@@ -430,13 +689,6 @@ main(){
 		if [ "$cmd" -eq 1 ] && [ -f "$filepubkey" ] ; then
 			
 			#add to know_hosts for firsttime
-			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm -r ${memtemp_remote}")
-			cmd=$?
-			myprintf "remove temp folder at remote" "$cmd"
-			#cmd=1:  run cmd fail at remote
-			#cmd=255: connection fail
-			#cmd=0:ok
-			
 			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "mkdir ${memtemp_remote}")
 			cmd=$?
 			myprintf "mkdir temp at remote" "$cmd"
@@ -468,5 +720,7 @@ main(){
 #main
 #find_list_same_files "/home/dungnt/ShellScript" "/home/backup/sosanh"
 #sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/sosanh"
-#append_file_to_remote "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
-append_file_to_remote /home/dungnt/ShellScript/file_nhieu_mb.txt /home/backup/sosanh
+#append_with_hash_checking "/home/dungnt/ShellScript/\` '  @#$%^&( ).sdf" /home/backup/sosanh
+#append_with_hash_checking /home/dungnt/ShellScript/file_nhieu_mb.txt /home/backup/sosanh
+#append_with_hash_checking /media/dungnt/BBC4-B189/file300mb.txt /home/backup
+append_with_hash_checking /home/dungnt/ShellScript/test.sh /home/backup/sosanh
