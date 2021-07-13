@@ -15,6 +15,7 @@ memtemp_remote="$appdir_remote"/.temp
 compare_listfile_inremote=comparelistfile_remote.sh
 getmd5hash_inremote=getmd5hash_inremote.sh
 truncatefile_inremote=truncatefile_inremote.sh
+catfile_inremote=catfile_inremote.sh
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 
 destipv6addr="backup@"
@@ -325,7 +326,196 @@ sync_file_in_dir(){
 #------------------------------ APPEND FILE --------------------------------
 
 append_native_file(){
-	echp ''
+	SECONDS=0
+	local dir1=$1
+	local dir2=$2
+	local filename=$3
+	local filesizeinremote=$4
+	local filenameinhex=$(echo "$dir2"/"$filename" | tr -d '\n' | xxd -pu -c 1000000)
+	local result
+	local cmd
+	local cmd1
+	local cmd2
+	local cmd3
+	local cmd4
+	local loopforcount
+	local count
+	local cutsize
+	local filesize
+	local stopsize
+	local checksize
+	local tempfilename="tempfile.being"
+	local end
+	
+	for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+	do		
+		#vuot timeout
+		if [ "$loopforcount" -eq 20 ] ;  then
+			echo 'upload truncate file and catfile timeout, nghi dai'
+			return 1
+		fi
+		
+		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$truncatefile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+		cmd1=$?
+		myprintf "scp 1 truncatefile" "$cmd1"
+		
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${filenameinhex} 1")
+		cmd2=$?
+		myprintf "run truncatefile in remote" "$cmd2"
+		
+		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$catfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+		cmd3=$?
+		myprintf "scp 1 catfile" "$cmd3"
+		
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${catfile_inremote} ${memtemp_remote}/${tempfilename}")
+		cmd4=$?
+		myprintf "del tempcatfile in remote" "$cmd4"
+		#cmd4 ne 255 co the gay loi
+		if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -eq 0 ] && [ "$cmd4" -ne 255 ] ; then
+			#thoat vong lap for
+			break
+		else
+			sleep 15			
+		fi	
+	done
+	#khi filesize=0 do bi xoa dot ngot, cau lenh rsync phia duoi se loi --> return 1
+	count=0
+	filesize=$(wc -c "$dir1"/"$filename" | awk '{print $1}')
+	stopsize=$(( ($filesize / (8*1024*1024) ) + 1 ))
+	end=0
+	
+	while true; do
+		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+		do		
+			#vuot timeout
+			if [ "$loopforcount" -eq 20 ] ;  then
+				echo 'server busy, nghi dai'
+				return 1
+			fi
+		
+			verify_logged
+			cmd1=$?
+			myprintf "verify active user" "$cmd1"
+		
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "netstat -atn | grep ':22 ' | grep 'ESTABLISHED' | wc -l")
+			cmd2=$?
+			myprintf "run countsshuser" "$cmd2"
+			myprintf "num sshuser" "$result"
+			
+			if [ "$cmd1" -eq 0 ] && [ "$cmd2" -ne 255 ] && [ "$result" -lt 2 ] ; then
+				#thoat vong lap for
+				break
+			else
+				sleep 15			
+			fi	
+		done
+		
+		rm "$memtemp_local"/"$tempfilename"
+		
+		if [ "$count" -eq 0 ] ; then
+			cutsize=$(( ($filesizeinremote / (8*1024*1024) ) ))
+			#get 256MB file from localfile, bo qua kich thuoc file tren remote
+			dd if="$dir1"/"$filename" of="$memtemp_local"/"$tempfilename" bs="8M" count=32 skip="$cutsize"
+		else
+			cutsize=$(( $cutsize + 32 ))
+			echo "cutsize: ""$cutsize"
+			#get 256MB file from localfile, bo qua kich thuoc file tren remote co tinh them cac lan lap truoc
+			dd if="$dir1"/"$filename" of="$memtemp_local"/"$tempfilename" bs="8M" count=32 skip="$cutsize"
+		fi
+		
+		checksize=$(( ($cutsize + 32)*8*1024*1024 ))
+		
+		if [ "$checksize" -ge "$filesize" ] ; then
+			end=1
+		fi
+		 
+		count=$(($count + 1))
+		
+		#rsync tu khoi phuc khi mat mang, co mang lai
+		echo 'begin upload partial file'
+		rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$memtemp_local"/"$tempfilename" "$destipv6addr_scp":"$memtemp_remote"/
+		cmd=$?
+		if [ "$cmd" -ne 0 ] ; then
+			echo 'rsync error, nghi dai'
+			return 1
+		fi
+		
+		#for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+		#do	
+			#vuot timeout
+		#	if [ "$loopforcount" -eq 20 ] ;  then
+		#		echo 'scp partial file timeout, nghi dai'
+		#		return 1
+		#	fi
+			
+		#	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$memtemp_local"/"$tempfilename" "$destipv6addr_scp":"$memtemp_remote"/)
+		#	cmd=$?
+		#	myprintf "scp partial file in remote" "$cmd"
+		
+		#	if [ "$cmd" -eq 0 ] ; then
+				#thoat vong lap for
+		#		break
+		#	else
+		#		sleep 15			
+		#	fi	
+		#done
+		
+		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+		do	
+			#vuot timeout
+			if [ "$loopforcount" -eq 20 ] ;  then
+				echo 'catfile timeout, nghi dai'
+				return 1
+			fi
+			
+			echo 'begin cat partial file'
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${catfile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex}")
+			cmd=$?
+			myprintf "run catfile in remote" "$cmd"
+		
+			if [ "$cmd" -eq 0 ] ; then
+				#thoat vong lap for
+				break
+			else
+				sleep 15			
+			fi	
+		done
+		
+		if [ "$end" -eq 1 ] ; then
+			for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+			do	
+				#vuot timeout
+				if [ "$loopforcount" -eq 20 ] ;  then
+					echo 'shrink remote file timeout, nghi dai'
+					return 1
+				fi
+				
+				echo 'shrink remote file'
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${filenameinhex} 2")
+				cmd=$?
+				myprintf "run shrink remote file in remote" "$cmd"
+			
+				if [ "$cmd" -eq 0 ] ; then
+					#thoat vong lap for
+					break
+				else
+					sleep 15			
+				fi	
+			done
+			
+			#rsync tu khoi phuc khi mat mang, co mang lai
+			echo 'append last of file'
+			rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"$dir2"/
+			cmd=$?
+			myprintf "append last of file in remote" "$cmd"
+			echo "Elapsed Time (using \$SECONDS): $SECONDS seconds"
+			if [ "$cmd" -ne 0 ] ; then
+				return 1
+			else
+				return 0
+			fi
+		fi
+	done
 }
 
 append_file_with_hash_checking(){
@@ -410,9 +600,9 @@ copy_file() {
 	local dir1=$1
 	local dir2=$2
 	local filename=$3
-	local filesizeinremote=$4
 	
-	append_native_file "$dir1" "$dir2" "$filename" "$filesizeinremote"
+	append_native_file "$dir1" "$dir2" "$filename" 0
+	
 	return "$?"
 }
 
@@ -467,7 +657,7 @@ main(){
 #main
 #sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/biết sosanh"
 #append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 99
-append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
+#append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
 #append_file_with_hash_checking /home/dungnt/ShellScript "/home/backup/biết sosanh" mySync_final.sh 13506
-#copy_file /media/dungnt/BBC4-B189 /home/backup file300mb.txt
-#copy_file /home/dungnt/ShellScript /home/backup mySync_final.sh xxxbyte
+copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
+#append_native_file /home/dungnt/ShellScript /home/backup file300mb.txt 449639702
