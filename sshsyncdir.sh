@@ -14,6 +14,7 @@ memtemp_remote="$appdir_remote"/.temp
 
 compare_listfile_inremote=comparelistfile_remote.sh
 getmd5hash_inremote=getmd5hash_inremote.sh
+truncatefile_inremote=truncatefile_inremote.sh
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 
 destipv6addr="backup@"
@@ -31,9 +32,7 @@ uploadmd5hashfile=md5hashfile_fromlocal.txt
 sleeptime=5
 #for PRINTING
 prt=1
-#for COMPARE
-copyfilesize="500MB"
-truncsize=500000000
+
 
 #----------------------------------------TOOLS-------------------------------------
 
@@ -326,54 +325,7 @@ sync_file_in_dir(){
 #------------------------------ APPEND FILE --------------------------------
 
 append_native_file(){
-	local param1=$1
-	local param2=$2
-	local param3=$3
-	local param4=$4
-	local result
-	local cmd
-	local cmd1
-	local cmd2
-	local loopforcount
-	
-	while true; do
-		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
-		do		
-			#vuot timeout
-			if [ "$loopforcount" -eq 20 ] ;  then
-				echo 'append timeout, nghi dai'
-				return 1
-			fi
-		
-			verify_logged
-			cmd1=$?
-			myprintf "verify active user" "$cmd1"
-		
-			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i /home/dungnt/.ssh/id_rsa_backup_58 backup@192.168.1.58 "netstat -atn | grep ':22 ' | grep 'ESTABLISHED' | wc -l")
-			cmd2=$?
-			myprintf "run countsshuser" "$cmd2"
-			myprintf "num sshuser" "$result"
-			
-			if [ "$cmd1" -eq 0 ] && [ "$cmd2" -ne 255 ] && [ "$result" -lt 2 ] ; then
-				#thoat vong lap for
-				break
-			else
-				sleep 15			
-			fi	
-		done
-		#ERORRRRRRRRRRRRRR:rsync append 2 m --->loi:file cop bi sai o vi tri append
-		echo 'begin append 2m'
-		rsync -vah --append --time-limit=2 -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$param1"/"$param4" "$param2":"$param3"/"$param4"
-		cmd=$?
-		if [ "$cmd" -eq 0 ] ; then
-			echo 'append ends successfully'
-			return 0
-		elif [ "$cmd" -ne 30 ] ; then
-			echo 'nghi dai ko ro loi cua rcync '"$cmd"
-			return 1
-		fi
-		
-	done
+	echp ''
 }
 
 append_file_with_hash_checking(){
@@ -409,7 +361,7 @@ append_file_with_hash_checking(){
 		cmd1=$?
 		myprintf "scp 1 shellmd5hashfile" "$cmd1"
 	
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i /home/dungnt/.ssh/id_rsa_backup_58 backup@192.168.1.58 "bash ${memtemp_remote}/${getmd5hash_inremote} ${tempfilename}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${getmd5hash_inremote} ${tempfilename}")
 		cmd2=$?
 		echo "get ""$cmd2"" md5sum:""$result"
 		
@@ -433,16 +385,16 @@ append_file_with_hash_checking(){
 			filesize=$(wc -c "$param1"/"$filename" | awk '{print $1}')
 	
 			if [ -f "$param1"/"$filename" ] && [ "$filesize" -gt 0 ] ; then
-				truncnum=$(( ( $filesize_remote / $truncsize ) + 1 ))
+				truncnum=$(( ( $filesize_remote / 500000000 ) + 1 ))
 				echo 'truncnum ' "$truncnum"
-				dd if="$param1"/"$filename" of="$memtemp_local"/"$temphashfilename" bs="$copyfilesize" count="$truncnum" skip=0
+				dd if="$param1"/"$filename" of="$memtemp_local"/"$temphashfilename" bs="500MB" count="$truncnum" skip=0
 				truncate -s "$filesize_remote" "$memtemp_local"/"$temphashfilename"
 				hashlocalfile=$(md5sum "$memtemp_local"/"$temphashfilename" | awk '{ print $1 }')
 				if [ "$hashlocalfile" == "$hashremotefile" ] ; then
-					echo 'has same md5hash after truncate'
+					echo 'has same md5hash after truncate-->continue append'
 					return 0
 				else
-					echo 'has same md5hash after truncate-->copy'
+					echo 'no same md5hash after truncate-->copy total file'
 					return 1
 				fi
 			
@@ -455,11 +407,12 @@ append_file_with_hash_checking(){
 }
 
 copy_file() {
-	local param1=$1
-	local param2=$2
+	local dir1=$1
+	local dir2=$2
 	local filename=$3
+	local filesizeinremote=$4
 	
-	append_native_file "$param1" "$destipv6addr_scp" "$param2" "$filename"
+	append_native_file "$dir1" "$dir2" "$filename" "$filesizeinremote"
 	return "$?"
 }
 
@@ -514,6 +467,7 @@ main(){
 #main
 #sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/biết sosanh"
 #append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 99
-#append_file_with_hash_checking /media/dungnt/BBC4-B189 /home/backup file300mb.txt 546537472
+append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
 #append_file_with_hash_checking /home/dungnt/ShellScript "/home/backup/biết sosanh" mySync_final.sh 13506
-copy_file /media/dungnt/BBC4-B189 /home/backup file300mb.txt
+#copy_file /media/dungnt/BBC4-B189 /home/backup file300mb.txt
+#copy_file /home/dungnt/ShellScript /home/backup mySync_final.sh xxxbyte
