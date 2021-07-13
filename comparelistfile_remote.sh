@@ -45,7 +45,7 @@ get_src_content_file_md5sum(){
 #ten file chua ds file tu phia local
 param1=$1
 #thu muc dang sync phia remote
-param2=$2
+param2=$(echo "$2" | tr -d '\n' | xxd -r -p)
 #outputfilename 
 param3=$3
 
@@ -118,7 +118,7 @@ if [ -f "$memtemp""/""$param1" ] ; then
 	done
 
 	#1:same file
-	#0:can hash tung phan de kiem tra ---> copy/append phai hash
+	#0:can hash tung phan de kiem tra ---> append phai hash
 	#5:chi ton tai phia local do phia remote kich thuoc qua lon nen bi xoa --->can copy
 	count=0
 	for i in "${!names[@]}" ; do
@@ -187,6 +187,7 @@ if [ -f "$memtemp""/""$param1" ] ; then
 
 	#echo "$count"'------------------------file so sanh------------------------------' >> "$memtemp""/""$param3"
 	#so sanh
+	#2:da co san o remote, sai ten thoi--->doi ten
 	#4:file chi co o local, ko co o remote ---> can copy
 	for i in "${!names_nt[@]}"
 	do
@@ -216,7 +217,7 @@ if [ -f "$memtemp""/""$param1" ] ; then
 	do
 		if [ "${isselected_remote_nt[$i]}" -eq 0 ] ; then
 			rm "$param2""/""${names_remote_nt[$i]}"
-			printf "./%s/3/%s/0/null/0\n" "${names_remote_nt[$j]}" "${names_remote_nt[$j]}" >> "$memtemp""/""$param3"
+			printf "./%s/3/%s/0/null/0/0\n" "${names_remote_nt[$i]}" "${names_remote_nt[$i]}" >> "$memtemp""/""$param3"
 		fi
 	done
 
