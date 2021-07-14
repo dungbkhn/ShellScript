@@ -372,11 +372,16 @@ append_native_file(){
 			sleep 15			
 		fi	
 	done
-	#khi filesize=0 do bi xoa dot ngot, cau lenh rsync phia duoi se loi --> return 1
+	
 	count=0
-	filesize=$(wc -c "$dir1"/"$filename" | awk '{print $1}')
-	stopsize=$(( ($filesize / (8*1024*1024) ) + 1 ))
 	end=0
+	filesize=$(wc -c "$dir1"/"$filename" | awk '{print $1}')
+	#khi filesize=rong do bi xoa dot ngot --> return 1
+	if [ ! "$filesize" ] ; then
+		return 1
+	fi
+	
+	stopsize=$(( ($filesize / (8*1024*1024) ) + 1 ))
 	
 	while true; do
 		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
@@ -625,5 +630,5 @@ main(){
 #append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 99
 #append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
 #append_file_with_hash_checking /home/dungnt/ShellScript "/home/backup/biết sosanh" mySync_final.sh 13506
-#copy_file /home/dungnt/ShellScript /home/backup filetest.txt
-append_native_file /home/dungnt/ShellScript /home/backup mySync_final.sh 0
+copy_file /home/dungnt/ShellScript /home/backup filetest.txt
+#append_native_file /home/dungnt/ShellScript /home/backup mySync_final.sh 0
