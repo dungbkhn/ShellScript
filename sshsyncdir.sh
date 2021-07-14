@@ -629,5 +629,5 @@ main(){
 #append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 99
 #append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
 #append_file_with_hash_checking /home/dungnt/ShellScript "/home/backup/biết sosanh" mySync_final.sh 13506
-copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
-#append_native_file /home/dungnt/ShellScript /home/backup file300mb.txt 449639702
+#copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
+append_native_file /home/dungnt/ShellScript /home/backup file300mb.txt 449639702
