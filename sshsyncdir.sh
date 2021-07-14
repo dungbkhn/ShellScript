@@ -440,26 +440,6 @@ append_native_file(){
 			return 1
 		fi
 		
-		#for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
-		#do	
-			#vuot timeout
-		#	if [ "$loopforcount" -eq 20 ] ;  then
-		#		echo 'scp partial file timeout, nghi dai'
-		#		return 1
-		#	fi
-			
-		#	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$memtemp_local"/"$tempfilename" "$destipv6addr_scp":"$memtemp_remote"/)
-		#	cmd=$?
-		#	myprintf "scp partial file in remote" "$cmd"
-		
-		#	if [ "$cmd" -eq 0 ] ; then
-				#thoat vong lap for
-		#		break
-		#	else
-		#		sleep 15			
-		#	fi	
-		#done
-		
 		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
 		do	
 			#vuot timeout
@@ -659,5 +639,5 @@ main(){
 #append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 99
 #append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
 #append_file_with_hash_checking /home/dungnt/ShellScript "/home/backup/biết sosanh" mySync_final.sh 13506
-copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
+#copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
 #append_native_file /home/dungnt/ShellScript /home/backup file300mb.txt 449639702
