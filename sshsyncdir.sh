@@ -326,7 +326,6 @@ sync_file_in_dir(){
 #------------------------------ APPEND FILE --------------------------------
 
 append_native_file(){
-	SECONDS=0
 	local dir1=$1
 	local dir2=$2
 	local filename=$3
@@ -344,6 +343,11 @@ append_native_file(){
 	local checksize
 	local tempfilename="tempfile.being"
 	local end
+	local lasttrunc
+	declare -a getpipest
+	
+	#do thoi gian
+	SECONDS=0
 	
 	for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
 	do		
@@ -404,31 +408,44 @@ append_native_file(){
 		
 		if [ "$count" -eq 0 ] ; then
 			cutsize=$(( ($filesizeinremote / (8*1024*1024) ) ))
-			#get 256MB file from localfile, bo qua kich thuoc file tren remote
-			dd if="$dir1"/"$filename" of="$memtemp_local"/"$tempfilename" bs="8M" count=32 skip="$cutsize"
 		else
 			cutsize=$(( $cutsize + 32 ))
-			echo "cutsize: ""$cutsize"
-			#get 256MB file from localfile, bo qua kich thuoc file tren remote co tinh them cac lan lap truoc
-			dd if="$dir1"/"$filename" of="$memtemp_local"/"$tempfilename" bs="8M" count=32 skip="$cutsize"
 		fi
 		
 		checksize=$(( ($cutsize + 32)*8*1024*1024 ))
 		
 		if [ "$checksize" -ge "$filesize" ] ; then
 			end=1
+			lasttrunc=$(( $filesize - ($cutsize*8*1024*1024) ))
+			lasttrunc=$(( $lasttrunc / (8*1024*1024)  ))
 		fi
-		 
-		count=$(($count + 1))
 		
-		#rsync tu khoi phuc khi mat mang, co mang lai
-		echo 'begin upload partial file'
-		rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$memtemp_local"/"$tempfilename" "$destipv6addr_scp":"$memtemp_remote"/
-		cmd=$?
-		if [ "$cmd" -ne 0 ] ; then
-			echo 'rsync error, nghi dai'
-			return 1
-		fi
+		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+		do	
+			#vuot timeout
+			if [ "$loopforcount" -eq 20 ] ;  then
+				echo 'uploadfile timeout, nghi dai'
+				return 1
+			fi
+			
+			echo 'begin upload partial file'
+			if [ "$end" -ne 1 ] ; then
+				dd if="$dir1"/"$filename" bs="8M" count=32 skip="$cutsize" | ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" dd of="$memtemp_remote"/"$tempfilename"
+			else
+				dd if="$dir1"/"$filename" bs="8M" count="$lasttrunc" skip="$cutsize" | ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" dd of="$memtemp_remote"/"$tempfilename"
+			fi
+			getpipest=( "${PIPESTATUS[@]}" )
+			echo "upload file to remote ""${getpipest[0]}"" va ""${getpipest[1]}"
+		
+			if [ "${getpipest[0]}" -eq 0 ] && [ "${getpipest[1]}" -eq 0 ] ; then
+				#thoat vong lap for
+				break
+			else
+				sleep 15			
+			fi	
+		done
+
+		count=$(($count + 1))
 		
 		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
 		do	
@@ -452,33 +469,12 @@ append_native_file(){
 		done
 		
 		if [ "$end" -eq 1 ] ; then
-			for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
-			do	
-				#vuot timeout
-				if [ "$loopforcount" -eq 20 ] ;  then
-					echo 'shrink remote file timeout, nghi dai'
-					return 1
-				fi
-				
-				echo 'shrink remote file'
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 0")
-				cmd=$?
-				myprintf "run shrink remote file in remote" "$cmd"
-			
-				if [ "$cmd" -eq 0 ] ; then
-					#thoat vong lap for
-					break
-				else
-					sleep 15			
-				fi	
-			done
-			
 			#rsync tu khoi phuc khi mat mang, co mang lai
 			echo 'append last of file'
 			rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"$dir2"/
 			cmd=$?
 			myprintf "append last of file in remote" "$cmd"
-			echo "Elapsed Time (using \$SECONDS): $SECONDS seconds"
+			echo "elapsed time (using \$SECONDS): $SECONDS seconds"
 			if [ "$cmd" -ne 0 ] ; then
 				return 1
 			else
@@ -629,5 +625,5 @@ main(){
 #append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 99
 #append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
 #append_file_with_hash_checking /home/dungnt/ShellScript "/home/backup/biết sosanh" mySync_final.sh 13506
-#copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
-append_native_file /home/dungnt/ShellScript /home/backup file300mb.txt 449639702
+copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
+#append_native_file /home/dungnt/ShellScript /home/backup file300mb.txt 449639702
