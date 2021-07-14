@@ -5,54 +5,40 @@ shopt -s nullglob
 
 tempfilename="$1"
 
-#neu co tham so thu hai
-if [ "$2" ] ; then
-	filename=$(echo "$2" | tr -d '\n' | xxd -r -p)
-	
-	
-	#neu khong co tham so thu ba
-	if [ ! "$3" ] ; then
-		#file ton tai
-		if [ -f "$filename" ] ; then
-			filesize=$(wc -c "$filename" | awk '{print $1}')
-			
-			truncsize=$(( (filesize / (8*1024*1024) ) * (8*1024*1024) ))
+filename=$(echo "$2" | tr -d '\n' | xxd -r -p)
 
-			truncate -s "$truncsize" "$filename"
-			
-			rm "$tempfilename"
+#neu tham so thu ba = 0
+if [ "$3" -eq 0 ] ; then
+	#neu ton tai tham so thu tu = 0, copy total file --> remove old file
+	if [ "$4" -eq 0 ] ; then
+		rm "$filename"
 		
-			exit 0
-		else
-			rm "$tempfilename"
-		
-			exit 0
-		fi
-		
-	elif [ "$3" -eq 0 ] ; then
+		rm "$tempfilename"
+	
+		exit 0
+	#neu la append va file ton tai
+	elif [ -f "$filename" ] ; then
 		filesize=$(wc -c "$filename" | awk '{print $1}')
 		
-		filesize=$(( $filesize - 8 ))
+		truncsize=$(( (filesize / (8*1024*1024) ) * (8*1024*1024) ))
 
-		truncate -s "$filesize" "$filename"
+		truncate -s "$truncsize" "$filename"
 		
 		rm "$tempfilename"
-		
-		exit 0
-	else
-		if [ -f "$filename" ] ; then
-			cat "$tempfilename" >> "$filename"
-		else
-			mv "$tempfilename" "$filename"
-		fi
-		
-		rm "$tempfilename"
-		
+	
 		exit 0
 	fi
+elif [ "$3" -eq 1 ] ; then
+	if [ -f "$filename" ] ; then
+		cat "$tempfilename" >> "$filename"
+	else
+		mv "$tempfilename" "$filename"
+	fi
+	
+	rm "$tempfilename"
+	
+	exit 0
 fi
-#chi co duy nhat 1 tham so
-else
-	exit 1
-fi
+
+
 

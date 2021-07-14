@@ -18,8 +18,8 @@ truncatefile_inremote=truncatefile_inremote.sh
 catfile_inremote=catfile_inremote.sh
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 
-destipv6addr="backup@"
-destipv6addr_scp="backup@[]"
+destipv6addr="backup@2405:4803:fe18:bc50::e"
+destipv6addr_scp="backup@[2405:4803:fe18:bc50::e]"
 
 filepubkey=/home/dungnt/.ssh/id_rsa_backup_58
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
@@ -361,7 +361,7 @@ append_native_file(){
 		cmd1=$?
 		myprintf "scp 1 truncatefile" "$cmd1"
 		
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 0 ${filesizeinremote}")
 		cmd2=$?
 		myprintf "run truncatefile in remote" "$cmd2"
 		
@@ -549,16 +549,26 @@ append_file_with_hash_checking(){
 				truncnum=$(( ( $filesize_remote / 500000000 ) + 1 ))
 				echo 'truncnum ' "$truncnum"
 				dd if="$param1"/"$filename" of="$memtemp_local"/"$temphashfilename" bs="500MB" count="$truncnum" skip=0
-				truncate -s "$filesize_remote" "$memtemp_local"/"$temphashfilename"
-				hashlocalfile=$(md5sum "$memtemp_local"/"$temphashfilename" | awk '{ print $1 }')
-				if [ "$hashlocalfile" == "$hashremotefile" ] ; then
-					echo 'has same md5hash after truncate-->continue append'
-					return 0
+				
+				if [ -f "$memtemp_local"/"$temphashfilename" ] ; then
+					truncate -s "$filesize_remote" "$memtemp_local"/"$temphashfilename"
+					hashlocalfile=$(md5sum "$memtemp_local"/"$temphashfilename" | awk '{ print $1 }')
+					
+					if [ "$hashlocalfile" == "$hashremotefile" ] ; then
+						echo 'has same md5hash after truncate-->continue append'
+						append_native_file "$param1" "$param2" "$filename" "$filesize_remote"
+						return "$?"
+					else
+						echo 'no same md5hash after truncate-->copy total file'
+						copy_file "$param1" "$param2" "$filename"
+						return "$?"
+					fi
+					
 				else
-					echo 'no same md5hash after truncate-->copy total file'
+					echo 'dd command error, nghi dai'
 					return 1
 				fi
-			
+				
 			else
 				echo 'big error,ko thay file, nghi dai'
 				return 1
@@ -627,8 +637,6 @@ main(){
 
 #main
 #sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/biết sosanh"
-#append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 99
-#append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
-#append_file_with_hash_checking /home/dungnt/ShellScript "/home/backup/biết sosanh" mySync_final.sh 13506
-copy_file /home/dungnt/ShellScript /home/backup filetest.txt
-#append_native_file /home/dungnt/ShellScript /home/backup mySync_final.sh 0
+#copy_file /home/dungnt/ShellScript /home/backup mySync_final.sh
+#append_native_file /home/dungnt/ShellScript /home/backup mySync_final.sh 10
+append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup" "file300mb.txt" 449639702
