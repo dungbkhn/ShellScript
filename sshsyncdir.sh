@@ -336,8 +336,6 @@ append_native_file(){
 	local cmd
 	local cmd1
 	local cmd2
-	local cmd3
-	local cmd4
 	local loopforcount
 	local count
 	local cutsize
@@ -359,19 +357,11 @@ append_native_file(){
 		cmd1=$?
 		myprintf "scp 1 truncatefile" "$cmd1"
 		
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${filenameinhex} 1")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex}")
 		cmd2=$?
 		myprintf "run truncatefile in remote" "$cmd2"
 		
-		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$catfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
-		cmd3=$?
-		myprintf "scp 1 catfile" "$cmd3"
-		
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${catfile_inremote} ${memtemp_remote}/${tempfilename}")
-		cmd4=$?
-		myprintf "del tempcatfile in remote" "$cmd4"
-		#cmd4 ne 255 co the gay loi
-		if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -eq 0 ] && [ "$cmd4" -ne 255 ] ; then
+		if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] ; then
 			#thoat vong lap for
 			break
 		else
@@ -449,7 +439,7 @@ append_native_file(){
 			fi
 			
 			echo 'begin cat partial file'
-			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${catfile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex}")
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1")
 			cmd=$?
 			myprintf "run catfile in remote" "$cmd"
 		
@@ -471,7 +461,7 @@ append_native_file(){
 				fi
 				
 				echo 'shrink remote file'
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${filenameinhex} 2")
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 0")
 				cmd=$?
 				myprintf "run shrink remote file in remote" "$cmd"
 			
@@ -639,5 +629,5 @@ main(){
 #append_file_with_hash_checking "/home/dungnt/ShellScript" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 99
 #append_file_with_hash_checking /home/dungnt/ShellScript /home/backup file300mb.txt 326336512
 #append_file_with_hash_checking /home/dungnt/ShellScript "/home/backup/biết sosanh" mySync_final.sh 13506
-#copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
+copy_file /home/dungnt/ShellScript /home/backup file300mb.txt
 #append_native_file /home/dungnt/ShellScript /home/backup file300mb.txt 449639702
