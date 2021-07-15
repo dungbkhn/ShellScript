@@ -18,8 +18,8 @@ truncatefile_inremote=truncatefile_inremote.sh
 catfile_inremote=catfile_inremote.sh
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 
-destipv6addr="backup@"
-destipv6addr_scp="backup@[]"
+destipv6addr="backup@2405:4803:fe18:bc50::e"
+destipv6addr_scp="backup@[2405:4803:fe18:bc50::e]"
 
 filepubkey=/home/dungnt/.ssh/id_rsa_backup_58
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
@@ -307,10 +307,10 @@ sync_file_in_dir(){
 				if [ "${apporcop[$i]}" -eq 1 ] ; then
 					#file local da bi modify (ko ro vi tri bi modify) ---> append with hash
 					echo "->append:""mtimelc:""${mtime_local[$i]}"" mtime:""${mtime[$i]}""-""$param1"" ""$param2"" ""${name[$i]}"" ""${size[$i]}"
-					#append_file_with_hash_checking "$param1" "$param2" "${name[$i]}" "${size[$i]}"
+					append_file_with_hash_checking "$param1" "$param2" "${name[$i]}" "${size[$i]}"
 				else
 					echo "->copy:""$param1"" ""$param2"" ""${name[$i]}"
-					#copy_file "$param1" "$param2" "${name[$i]}"
+					copy_file "$param1" "$param2" "${name[$i]}"
 				fi
 			#neu ko tim thay
 			else
@@ -521,13 +521,13 @@ append_file_with_hash_checking(){
 	local param2=$2
 	local filename=$3
 	local filesize_remote=$4
+	local truncnum
 	local hashlocalfile
 	local hashremotefile
 	local result
 	local cmd
 	local cmd1
 	local cmd2
-	local count
 	local filesize
 	local loopforcount
 	local temphashfilename="tempfile.totalmd5sum.being"
@@ -561,47 +561,38 @@ append_file_with_hash_checking(){
 		fi	
 	done
 		
-	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] ; then
-		#thoat vong lap for
-		hashremotefile=$(echo "$result" | awk '{ print $1 }')
-		hashlocalfile=$(md5sum "$param1"/"$filename" | awk '{ print $1 }')
-		#echo "$hashlocalfile"
-		if [ "$hashlocalfile" == "$hashremotefile" ] ; then
-			echo 'has same md5hash'
-			return 0
-		else
-			filesize=$(wc -c "$param1"/"$filename" | awk '{print $1}')
-	
-			if [ -f "$param1"/"$filename" ] && [ "$filesize" -gt 0 ] ; then
-				truncnum=$(( ( $filesize_remote / 500000000 ) + 1 ))
-				echo 'truncnum ' "$truncnum"
-				dd if="$param1"/"$filename" of="$memtemp_local"/"$temphashfilename" bs="500MB" count="$truncnum" skip=0
-				
-				if [ -f "$memtemp_local"/"$temphashfilename" ] ; then
-					truncate -s "$filesize_remote" "$memtemp_local"/"$temphashfilename"
-					hashlocalfile=$(md5sum "$memtemp_local"/"$temphashfilename" | awk '{ print $1 }')
-					
-					if [ "$hashlocalfile" == "$hashremotefile" ] ; then
-						echo 'has same md5hash after truncate-->continue append'
-						append_native_file "$param1" "$param2" "$filename" "$filesize_remote"
-						return "$?"
-					else
-						echo 'no same md5hash after truncate-->copy total file'
-						copy_file "$param1" "$param2" "$filename"
-						return "$?"
-					fi
-					
-				else
-					echo 'dd command error, nghi dai'
-					return 1
-				fi
-				
+	hashremotefile=$(echo "$result" | awk '{ print $1 }')
+	filesize=$(wc -c "$param1"/"$filename" | awk '{print $1}')
+
+	if [ -f "$param1"/"$filename" ] && [ "$filesize" -gt 0 ] ; then
+		truncnum=$(( ( $filesize_remote / 500000000 ) + 1 ))
+		echo 'truncnum ' "$truncnum"
+		dd if="$param1"/"$filename" of="$memtemp_local"/"$temphashfilename" bs="500MB" count="$truncnum" skip=0
+		
+		if [ -f "$memtemp_local"/"$temphashfilename" ] ; then
+			truncate -s "$filesize_remote" "$memtemp_local"/"$temphashfilename"
+			hashlocalfile=$(md5sum "$memtemp_local"/"$temphashfilename" | awk '{ print $1 }')
+			
+			if [ "$hashlocalfile" == "$hashremotefile" ] ; then
+				echo 'has same md5hash after truncate-->continue append'
+				append_native_file "$param1" "$param2" "$filename" "$filesize_remote"
+				return "$?"
 			else
-				echo 'big error,ko thay file, nghi dai'
-				return 1
+				echo 'no same md5hash after truncate-->copy total file'
+				copy_file "$param1" "$param2" "$filename"
+				return "$?"
 			fi
+			
+		else
+			echo 'dd command error, nghi dai'
+			return 1
 		fi
-	fi	
+		
+	else
+		echo 'big error,ko thay file, nghi dai'
+		return 1
+	fi
+		
 }
 
 copy_file() {
@@ -663,10 +654,10 @@ main(){
 }
 
 #main
-#sync_file_in_dir "/home/dungnt/ShellScript" "/home/backup/biết sosanh"
+sync_file_in_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf"
 #append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 36
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "filetest.txt"
 #append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "filetest.txt" 7462422
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "file300mb.txt"
-append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "file300mb.txt" 449639702
+#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "file300mb.txt" 449639702
