@@ -164,9 +164,7 @@ find_list_same_files () {
 	#ERROR: co the co loi khi file vua bi xoa truoc khi lay filezise....
 	#giai quyet: lay filesize cuoi cung, neu =0 --> bi xoa roi
 	for pathname in ./* ;do
-		if [ -d "$pathname" ] ; then 
-			printf "%s/%s/0/0/0\n" "$pathname" "d" >> "$mytemp"/"$listfiles"
-		else
+		if [ -f "$pathname" ] ; then 
 			md5hash=$(head -c 1024 "$pathname" | md5sum | awk '{ print $1 }')
 			#md5tailhash=$(get_src_content_file_md5sum "$pathname")
 			mtime_temp=$(stat "$pathname" --printf='%y\n')
@@ -343,6 +341,7 @@ append_native_file(){
 	local count
 	local cutsize
 	local filesize
+	local newfilesize
 	local checksize
 	local tempfilename="tempfile.being"
 	local tempfilename_inremote="readyfile.being"
@@ -420,62 +419,67 @@ append_native_file(){
 		
 		checksize=$(( ($cutsize + 32)*8*1024*1024 ))
 		
-		if [ "$checksize" -ge "$filesize" ] ; then
+		newfilesize=$(wc -c "$dir1"/"$filename" | awk '{print $1}')
+		echo "$newfilesize"
+		if [ ! "$newfilesize" ] || [ "$newfilesize" -ne "$filesize" ] || [ "$checksize" -ge "$filesize" ] ; then
 			end=1
+			echo "ket thuc"
 		fi
 		
-		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
-		do	
-			#vuot timeout
-			if [ "$loopforcount" -eq 20 ] ;  then
-				echo 'uploadfile timeout, nghi dai'
-				return 1
-			fi
+		if [ "$newfilesize" -eq "$filesize" ] ; then
+			for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+			do	
+				#vuot timeout
+				if [ "$loopforcount" -eq 20 ] ;  then
+					echo 'uploadfile timeout, nghi dai'
+					return 1
+				fi
+				
+				echo 'begin upload partial file'
+				echo "cutsize: ""$cutsize"
+				echo "lasttrunc: ""$lasttrunc"
+
+				dd if="$dir1"/"$filename" bs="8M" count=32 skip="$cutsize" | ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" dd of="$memtemp_remote"/"$tempfilename"
+
+				getpipest=( "${PIPESTATUS[@]}" )
+				echo "upload file to remote ""${getpipest[0]}"" va ""${getpipest[1]}"
 			
-			echo 'begin upload partial file'
-			echo "cutsize: ""$cutsize"
-			echo "lasttrunc: ""$lasttrunc"
+				if [ "${getpipest[0]}" -eq 0 ] && [ "${getpipest[1]}" -eq 0 ] ; then
+					#thoat vong lap for
+					break
+				else
+					sleep 15			
+				fi	
+			done
 
-			dd if="$dir1"/"$filename" bs="8M" count=32 skip="$cutsize" | ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" dd of="$memtemp_remote"/"$tempfilename"
-
-			getpipest=( "${PIPESTATUS[@]}" )
-			echo "upload file to remote ""${getpipest[0]}"" va ""${getpipest[1]}"
-		
-			if [ "${getpipest[0]}" -eq 0 ] && [ "${getpipest[1]}" -eq 0 ] ; then
-				#thoat vong lap for
-				break
-			else
-				sleep 15			
-			fi	
-		done
-
-		count=$(($count + 1))
-		
-		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
-		do	
-			#vuot timeout
-			if [ "$loopforcount" -eq 20 ] ;  then
-				echo 'catfile timeout, nghi dai'
-				return 1
-			fi
+			count=$(($count + 1))
 			
-			echo 'begin cat partial file'
-			if [ "$end" -eq 1 ] ; then
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1 1")
-				cmd=$?
-			else
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1 0")
-				cmd=$?
-			fi
-			myprintf "run catfile in remote" "$cmd"
-		
-			if [ "$cmd" -eq 0 ] ; then
-				#thoat vong lap for
-				break
-			else
-				sleep 15			
-			fi	
-		done
+			for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+			do	
+				#vuot timeout
+				if [ "$loopforcount" -eq 20 ] ;  then
+					echo 'catfile timeout, nghi dai'
+					return 1
+				fi
+				
+				echo 'begin cat partial file'
+				if [ "$end" -eq 1 ] ; then
+					result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1 1")
+					cmd=$?
+				else
+					result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1 0")
+					cmd=$?
+				fi
+				myprintf "run catfile in remote" "$cmd"
+			
+				if [ "$cmd" -eq 0 ] ; then
+					#thoat vong lap for
+					break
+				else
+					sleep 15			
+				fi	
+			done
+		fi
 		
 		if [ "$end" -eq 1 ] ; then
 			#rsync tu khoi phuc khi mat mang, co mang lai
