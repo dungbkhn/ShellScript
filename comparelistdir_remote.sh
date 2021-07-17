@@ -188,6 +188,7 @@ for j in "${!name_remote[@]}" ; do
 	if [ "${maxsavelinkedname_remote[$j]}" != "" ] ; then
 		#printf "%s tren remote co linked toi /%s/ id= %s voi subcount=%d\n" "${name_remote[$j]}" "${maxsavelinkedname_remote[$j]}" "${maxsavelinkedid_remote[$j]}" "${maxsubcount_remote[$j]}"
 		tempid="${maxsavelinkedid_remote[$j]}"
+		mv "$param2"/"${name_remote[$j]}" "$param2"/"${name[$tempid]}"
 		printf "%s/2/%s\n" "${name[$tempid]}" "${name_remote[$j]}" >> "$memtemp"/"$param3"
 		hassamedir_remote[$j]=1
 		hassamedir["$tempid"]=1
@@ -233,7 +234,7 @@ for i in "${!name[@]}" ; do
 						hassamedir[$i]=1
 						#sau phai in ra file, dang test nen in ra man hinh
 						printf "%s/3/%s\n" "${name[$i]}" "${name_remote[$j]}" >> "$memtemp"/"$param3"
-						
+						mv "$param2"/"${name_remote[$j]}" "$param2"/"${name[$i]}"
 						break
 					fi
 				fi
@@ -246,6 +247,7 @@ for i in "${!name[@]}" ; do
 			hassamedir_remote[$j_found]=1
 			hassamedir[$i]=1
 			#sau phai in ra file, dang test nen in ra man hinh
+			mv "$param2"/"${name_remote[$j_found]}" "$param2"/"${name[$i]}"
 			printf "%s/4/%s\n" "${name[$i]}" "${name_remote[$j_found]}" >> "$memtemp"/"$param3"
 			
 		fi
