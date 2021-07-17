@@ -194,7 +194,7 @@ find_list_same_files () {
 	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -ne 255 ] ; then
 		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
 		do
-			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listfile_inremote} /${listfiles} ${pathname} ${outputfile_inremote}")
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listfile_inremote} ${listfiles} ${pathname} ${outputfile_inremote}")
 			cmd=$?
 			myprintf "ssh generate new outputfile" "$cmd"
 			if [ "$cmd" -eq 0 ] ; then
@@ -658,7 +658,8 @@ main(){
 }
 
 #main
-sync_file_in_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
+find_list_same_files "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
+#sync_file_in_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf"
 #append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 36
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "filetest.txt"
