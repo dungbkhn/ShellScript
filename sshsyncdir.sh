@@ -12,6 +12,7 @@ appdir_remote=/home/backup
 memtemp_local="$appdir_local"/.temp
 memtemp_remote="$appdir_remote"/.temp
 
+compare_listdir_inremote=comparelistdir_remote.sh
 compare_listfile_inremote=comparelistfile_remote.sh
 getmd5hash_inremote=getmd5hash_inremote.sh
 truncatefile_inremote=truncatefile_inremote.sh
@@ -26,7 +27,7 @@ logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
 logtimefile=logtimefile.txt
 #file mang thong tin ds file trong dir --> up len de so sanh
 outputfileforcmp_inremote=outputfile_inremote.txt
-
+outputdirforcmp_inremote=outputdir_inremote.txt
 uploadmd5hashfile=md5hashfile_fromlocal.txt
 
 
@@ -212,11 +213,97 @@ find_list_same_files () {
 	fi
 }
 
+#------------------------------FIND SAME DIRS--------------------------------------
 
-sync_file_in_dir(){
+find_list_same_dirs () {
+	local param1=$1
+	local param2=$2
+	local count
+	local workingdir=$(pwd)
+	local cmd
+	local cmd1
+	local cmd2
+	local cmd3
+	local result
+	local pathname
+	local subpathname
+	local filesize
+	local listfiles="listdirsforcmp.txt"
+	local outputdir_inremote="$outputdirforcmp_inremote"
+	local loopforcount
+	
+	rm "$memtemp_local"/*
+
+	cd "$param1"/
+	
+	touch "$memtemp_local"/"$listfiles"
+	
+	for pathname in ./* ; do
+		if [ -d "$pathname" ] ; then 
+			printf "%s/b/%s/%s\n" "$pathname" "d" "0" >> "$memtemp_local"/"$listfiles"
+			count=0
+			cd "$param1"/"$pathname"
+			for subpathname in ./* ; do
+				if [ -d "$subpathname" ] ; then 
+					printf "%s/n/%s/%s\n" "$subpathname" "d" "1" >> "$memtemp_local"/"$listfiles"
+				else
+					printf "%s/n/%s/%s\n" "$subpathname" "f" "1" >> "$memtemp_local"/"$listfiles"
+				fi
+				count=$(($count + 1))
+				if [ "$count" -eq 5 ] ; then
+					break
+				fi
+			done
+			printf "%s/e/%s/%s\n" "$pathname" "d" "0" >> "$memtemp_local"/"$listfiles"		
+			cd "$param1"/
+		fi
+		
+	done
+	
+	
+	cd "$workingdir"/
+	
+	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$memtemp_local"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
+	cmd1=$?
+	myprintf "scp 1 listfile" "$cmd1"
+			
+	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listdir_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+	cmd2=$?
+	myprintf "scp 1 shellfile" "$cmd2"
+
+	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputdir_inremote}")
+	cmd3=$?
+	
+	myprintf "ssh remove old outputfile" "$cmd3"
+	pathname=$(echo "$param2" | tr -d '\n' | xxd -pu -c 1000000)
+	
+	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -ne 255 ] ; then
+		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+		do
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listdir_inremote} ${listfiles} ${pathname} ${outputdir_inremote}")
+			cmd=$?
+			myprintf "ssh generate new outputdir" "$cmd"
+			if [ "$cmd" -eq 0 ] ; then
+				break
+			else
+				sleep 1
+			fi
+		done
+		
+		if [ "$cmd" -eq 0 ] ; then
+			result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputdir_inremote" "$memtemp_local"/)
+			cmd=$?
+			myprintf "scp getback outputdir" "$cmd"
+		fi
+	fi
+}
+
+#-------------------------------------SYNC-----------------------------------------
+sync_dir(){
 	local param1=$1
 	local param2=$2
 	local mytemp="$memtemp_local"
+	local outputdir_inremote="$outputdirforcmp_inremote"
 	local outputfile_inremote="$outputfileforcmp_inremote"
 	local cmd
 	local findresult
@@ -232,6 +319,9 @@ sync_file_in_dir(){
 	local afterslash_7
 	
 	# declare array
+	declare -a dirname
+	
+	# declare array
 	declare -a name
 	declare -a size
 	declare -a md5hash
@@ -244,6 +334,36 @@ sync_file_in_dir(){
 	declare -a nameother
 	declare -a statusother
 	
+	#dong bo thu muc truoc
+	find_list_same_dirs "$param1" "$param2"
+	
+	if [ -f "$mytemp"/"$outputdir_inremote" ] ; then
+		count=0
+		while IFS=/ read beforeslash afterslash_1 afterslash_2 afterslash_3
+		do
+			#echo "$afterslash_1"
+			#echo "$afterslash_2"
+			if [ "$afterslash_1" != "" ] ; then
+				if [ "$afterslash_2" -ne 5 ] ; then
+					dirname[$count]="$afterslash_1"
+					count=$(($count + 1))				
+				fi
+			fi
+		done < "$mytemp"/"$outputdir_inremote"
+		
+		for i in "${!dirname[@]}"
+		do
+			#echo "$param1"/"${dirname[$i]}"
+			#echo "$param2"/"${dirname[$i]}"
+			sync_dir "$param1"/"${dirname[$i]}" "$param2"/"${dirname[$i]}"
+		done
+	fi
+	
+	unset beforeslash
+	unset afterslash_1
+	unset afterslash_2
+	
+	#dong bo files
 	find_list_same_files "$param1" "$param2"
 	
 	if [ -f "$mytemp"/"$outputfile_inremote" ] ; then
@@ -319,9 +439,9 @@ sync_file_in_dir(){
 		
 		echo "--------------------""$count"" files can append hoac copy ---------------------"
 		
-		return 0
-	else
-		return 1
+	#	return 0
+	#else
+	#	return 1
 	fi
 }
 	
@@ -658,8 +778,9 @@ main(){
 }
 
 #main
-find_list_same_files "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
-#sync_file_in_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
+#find_list_same_files "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
+#find_list_same_dirs "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
+sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf"
 #append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 36
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "filetest.txt"
