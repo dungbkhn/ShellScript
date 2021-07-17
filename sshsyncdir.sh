@@ -334,6 +334,8 @@ sync_dir(){
 	declare -a nameother
 	declare -a statusother
 	
+	printf "%s vs %s\n" "$param1" "$param2" 
+	
 	#dong bo thu muc truoc
 	find_list_same_dirs "$param1" "$param2"
 	
