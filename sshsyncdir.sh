@@ -22,7 +22,7 @@ dir_contains_uploadfiles="$appdir_local"/remotefiles
 destipv6addr="backup@"
 destipv6addr_scp="backup@[]"
 
-filepubkey=/home/dungnt/.ssh/id_rsa_backup_58
+filepubkey=/home/dungnt/.ssh/id_ed25519.pub
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
 logtimefile=logtimefile.txt
 #file mang thong tin ds file trong dir --> up len de so sanh
@@ -454,6 +454,7 @@ append_native_file(){
 	local dir2=$2
 	local filename=$3
 	local filesizeinremote=$4
+	#local hashfilebeforeup=$5
 	local filenameinhex=$(echo "$dir2"/"$filename" | tr -d '\n' | xxd -pu -c 1000000)
 	local result
 	local cmd
@@ -470,8 +471,6 @@ append_native_file(){
 	local end
 	declare -a getpipest
 	
-	#do thoi gian
-	SECONDS=0
 	#echo "$dir2""/""$filename"
 	for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
 	do		
@@ -559,13 +558,14 @@ append_native_file(){
 				
 				echo 'begin upload partial file'
 				echo "cutsize: ""$cutsize"
-				echo "lasttrunc: ""$lasttrunc"
-
+				SECONDS=0
+				
 				dd if="$dir1"/"$filename" bs="8M" count=32 skip="$cutsize" | ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" dd of="$memtemp_remote"/"$tempfilename"
-
+				
 				getpipest=( "${PIPESTATUS[@]}" )
 				echo "upload file to remote ""${getpipest[0]}"" va ""${getpipest[1]}"
-			
+				echo "elapsed time (using \$SECONDS): $SECONDS seconds"
+				
 				if [ "${getpipest[0]}" -eq 0 ] && [ "${getpipest[1]}" -eq 0 ] ; then
 					#thoat vong lap for
 					break
@@ -585,15 +585,13 @@ append_native_file(){
 				fi
 				
 				echo 'begin cat partial file'
-				if [ "$end" -eq 1 ] ; then
-					result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1 1")
-					cmd=$?
-				else
-					result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1 0")
-					cmd=$?
-				fi
+				SECONDS=0
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1")
+				cmd=$?
+
 				myprintf "run catfile in remote" "$cmd"
-			
+				echo "elapsed time (using \$SECONDS): $SECONDS seconds"
+				
 				if [ "$cmd" -eq 0 ] ; then
 					#thoat vong lap for
 					break
@@ -604,40 +602,65 @@ append_native_file(){
 		fi
 		
 		if [ "$end" -eq 1 ] ; then
+			for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+			do	
+				#vuot timeout
+				if [ "$loopforcount" -eq 20 ] ;  then
+					echo 'truncate end file timeout, nghi dai'
+					return 1
+				fi
+				
+				
+				echo 'begin truncate end file'
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 0")
+				cmd=$?
+				myprintf "truncate end file in remote" "$cmd"
+				
+				
+				if [ "$cmd" -eq 0 ] ; then
+					#thoat vong lap for
+					break
+				else
+					sleep 15			
+				fi	
+			done
+			
+			#do thoi gian rsync
+			SECONDS=0
 			#rsync tu khoi phuc khi mat mang, co mang lai
 			echo 'append last of file'
-			rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"$memtemp_remote"/"$tempfilename_inremote"
+			rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"/home/backup/.temp/readyfile.ending"
 			cmd=$?
 			myprintf "append last of file in remote" "$cmd"
 			
+			echo "elapsed time (using \$SECONDS): $SECONDS seconds"
 			if [ "$cmd" -ne 0 ] ; then
 				echo 'rsync append last of file fail!'
 				return 1
-			else
-				for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
-				do	
-					#vuot timeout
-					if [ "$loopforcount" -eq 20 ] ;  then
-						echo 'movement file timeout, nghi dai'
-						return 1
-					fi
-					
-					echo 'begin movement file'
-					result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2")
-					cmd=$?
-					myprintf "movement file in remote" "$cmd"
-				
-					if [ "$cmd" -eq 0 ] ; then
-						#thoat vong lap for
-						break
-					else
-						sleep 15			
-					fi	
-				done
-
-				echo "elapsed time (using \$SECONDS): $SECONDS seconds"
-				return 0
 			fi
+			
+			for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
+			do	
+				#vuot timeout
+				if [ "$loopforcount" -eq 20 ] ;  then
+					echo 'movement file timeout, nghi dai'
+					return 1
+				fi
+				
+				echo 'begin movement file'
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 1")
+				cmd=$?
+				myprintf "movement file in remote" "$cmd"
+			
+				if [ "$cmd" -eq 0 ] ; then
+					#thoat vong lap for
+					break
+				else
+					sleep 15			
+				fi	
+			done
+			
+			return 0
 		fi
 	done
 }
@@ -701,6 +724,7 @@ append_file_with_hash_checking(){
 			
 			if [ "$hashlocalfile" == "$hashremotefile" ] ; then
 				echo 'has same md5hash after truncate-->continue append'
+				#hashlocalfile=$(md5sum "$param1"/"$filename" | awk '{ print $1 }')
 				append_native_file "$param1" "$param2" "$filename" "$filesize_remote"
 				return "$?"
 			else
@@ -725,6 +749,8 @@ copy_file() {
 	local dir1=$1
 	local dir2=$2
 	local filename=$3
+	
+	#hashlocalfile=$(md5sum "$dir1"/"$filename" | awk '{ print $1 }')
 	
 	append_native_file "$dir1" "$dir2" "$filename" 0
 	
@@ -782,10 +808,10 @@ main(){
 #main
 #find_list_same_files "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
 #find_list_same_dirs "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
-sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
-#copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf"
-#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "\` '  @#$%^&( ).sdf" 36
-#copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "filetest.txt"
-#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "filetest.txt" 7462422
-#copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "file300mb.txt"
-#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh" "file300mb.txt" 449639702
+#sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
+#copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt"
+#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt" 50000000
+#copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi"
+#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi" 1
+#copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file300mb.txt"
+append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file300mb.txt" 10000
