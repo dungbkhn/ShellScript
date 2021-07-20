@@ -452,9 +452,7 @@ sync_dir(){
 append_native_file(){
 	local dir1=$1
 	local dir2=$2
-	local rsyndir2=$dir2
 	local filename=$3
-	local rsynfilename=$filename
 	local filesizeinremote=$4
 	local hashfilebeforeup=$5
 	local hashfileafterup
@@ -637,14 +635,8 @@ append_native_file(){
 			#do thoi gian rsync
 			SECONDS=0
 			#rsync tu khoi phuc khi mat mang, co mang lai
-			echo 'append last of file'
-			rsyndir2=$(echo ${dir2// /\\ })
-			rsynfilename=$(echo ${filename// /\\ })
-			#rsyndir2="$dir2"
-			#rsynfilename="$filename"
-			
-			rsync -vah --append --iconv=utf-8,utf-8 -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"$rsyndir2"/"$rsynfilename"
-
+			echo 'append last of file'		
+			rsync -vah --append --iconv=utf-8,utf-8 --protect-args -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"$dir2"/"$filename"
 			cmd=$?
 			myprintf "append last of file in remote" "$cmd"
 			
