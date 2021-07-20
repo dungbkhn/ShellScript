@@ -471,6 +471,7 @@ append_native_file(){
 	local end
 	local truncateparam4
 	local endfilename_inremote="readyfile.ending"
+	local uploadsize
 	
 	declare -a getpipest
 	
@@ -506,6 +507,8 @@ append_native_file(){
 	if [ ! "$filesize" ] ; then
 		return 1
 	fi
+	
+	uploadsize=$(( $filesize - $filesizeinremote))
 	
 	while true; do
 		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
@@ -619,7 +622,7 @@ append_native_file(){
 				
 				
 				echo 'begin truncate end file'
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 0")
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 0 ${uploadsize} ${filesizeinremote}")
 				cmd=$?
 				myprintf "truncate end file in remote" "$cmd"
 				
@@ -828,14 +831,14 @@ main(){
 	
 }
 
-mainhash=$(md5sum "/home/dungnt/ShellScript/tối quá"/"file tét.txt" | awk '{ print $1 }')
+mainhash=$(md5sum "/home/dungnt/ShellScript/tối quá"/"file500mb.txt" | awk '{ print $1 }')
 #main
 #find_list_same_files "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
 #find_list_same_dirs "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
 #sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt"
-append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt" 20000000 "$mainhash"
+#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt" 20000000 "$mainhash"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi"
 #append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi" 1 "$mainhash"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file500mb.txt"
-#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file500mb.txt" 16 "$mainhash"
+append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file500mb.txt" 200000000 "$mainhash"

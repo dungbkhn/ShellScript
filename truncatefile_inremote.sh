@@ -40,28 +40,62 @@ if [ "$3" -eq 0 ] ; then
 	fi
 elif [ "$3" -eq 1 ] ; then
 	if [ -f "$uploadfilename" ] ; then
-		cat "$tempfilename" >> "$uploadfilename"
+		rs=$(pgrep -f "$catfileinremote")
+		if [ -f "$tempfilename" ] && [ ! "$rs" ] ; then
+		
+			#chuan bi file cat
+			touch "$catfileinremote"
+			truncate -s 0 "$catfileinremote"
+			echo 'cat "$1" >> "$2"' >> "$catfileinremote"
+			echo 'rm "$1"' >> "$catfileinremote"
+			#for test
+			#echo 'while true; do' >> "$catfileinremote"
+			#echo 'sleep 5' >> "$catfileinremote"
+			#echo 'done' >> "$catfileinremote"
+			
+			bash "$catfileinremote" "$tempfilename" "$uploadfilename" &
+			
+			while true; do
+				if [ -f "$tempfilename" ] ; then
+					sleep 1
+				else
+					break
+				fi
+			done
+		else
+			while true; do
+				if [ -f "$tempfilename" ] ; then
+					sleep 1
+				else
+					break
+				fi
+			done
+		fi
+		
+		#cat "$tempfilename" >> "$uploadfilename"
 	else
-		mv "$tempfilename" "$uploadfilename"
+		if [ -f "$tempfilename" ] ; then
+			mv "$tempfilename" "$uploadfilename"
+			rm "$tempfilename"
+		fi
 	fi
-	
-	rm "$tempfilename"
-	
+
 	exit 0
 #"$3" -eq 2
 else
 	if [ "$4" -eq 0 ] ; then
 		
 		#co tempfile lai 1 byte
-		filesize=$(wc -c "$uploadfilename" | awk '{print $1}')
+		filesize="$5"
 		truncsize=$(( $filesize - 1 ))
 		truncate -s "$truncsize" "$uploadfilename"
 		
 		#chuan bi doi ten
 		newfilename="$filename"".concatenating"
 		
+		rs=$(pgrep -f "$catfileinremote")
 		#neu da append xong
-		if [ -f "$filename" ]; then
+		if [ "$6" -ne 0 ] && [ ! "$rs" ] ; then
 			
 			filesize=$(wc -c "$filename" | awk '{print $1}')
 			truncsize=$(( (filesize / (8*1024*1024) ) * (8*1024*1024) ))
@@ -71,18 +105,19 @@ else
 			#chuan bi file cat
 			touch "$catfileinremote"
 			truncate -s 0 "$catfileinremote"
-			echo 'cat "$1" >> "$2"' >> "$catfileinremote"
-			echo 'rm "$1"' >> "$catfileinremote"
-
-			#bat dau cat
-			mv "$filename" "$newfilename"
-			truncate -s "$truncsize" "$newfilename"
+			echo 'mv "$1" "$3"' >> "$catfileinremote"
+			echo 'truncate -s "$4" "$3"' >> "$catfileinremote"
+			echo 'cat "$2" >> "$3"' >> "$catfileinremote"
+			echo 'rm "$2"' >> "$catfileinremote"
 			
-			bash "$catfileinremote" "$uploadfilename" "$newfilename" &
+			#bat dau cat
+			#mv "$filename" "$newfilename"
+			#truncate -s "$truncsize" "$newfilename"
+			
+			bash "$catfileinremote" "$filename" "$uploadfilename" "$newfilename" "$truncsize" &
 			
 			while true; do
 				if [ -f "$uploadfilename" ] ; then
-					#echo 'sleep 1s'
 					sleep 1
 				else
 					break
@@ -91,9 +126,17 @@ else
 			
 			#cat "$uploadfilename" >> "$newfilename"
 			#rm "$uploadfilename"
-			
+		elif [ "$6" -ne 0 ] && [ "$rs" ] ; then
+			while true; do
+				if [ -f "$uploadfilename" ] ; then
+					sleep 1
+				else
+					break
+				fi
+			done
+		
 		#neu copy xong
-		else
+		elif [ "$6" -eq 0 ] ; then
 			mv "$uploadfilename" "$newfilename"
 		fi
 
