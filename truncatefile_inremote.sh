@@ -11,6 +11,8 @@ uploadfilename="/home/backup/.temp/uploadfile.ending"
 
 partialfile="/home/backup/.temp/partialfile.being"
 
+catfileinremote="/home/backup/.temp/catfileinremote.sh"
+
 #truncatestatusfile="/home/backup/.temp/trstatusfile.being"
 
 #echo "filename ban dau:""$filename" >> /home/backup/luutru.txt
@@ -49,27 +51,51 @@ elif [ "$3" -eq 1 ] ; then
 #"$3" -eq 2
 else
 	if [ "$4" -eq 0 ] ; then
+		
+		#co tempfile lai 1 byte
+		filesize=$(wc -c "$uploadfilename" | awk '{print $1}')
+		truncsize=$(( $filesize - 1 ))
+		truncate -s "$truncsize" "$uploadfilename"
+		
+		#chuan bi doi ten
 		newfilename="$filename"".concatenating"
 		
 		#neu da append xong
 		if [ -f "$filename" ]; then
-			mv "$filename" "$newfilename"
-			filesize=$(wc -c "$newfilename" | awk '{print $1}')
+			
+			filesize=$(wc -c "$filename" | awk '{print $1}')
 			truncsize=$(( (filesize / (8*1024*1024) ) * (8*1024*1024) ))
 			rm "$partialfile"
-			dd if="$newfilename" of="$partialfile" bs=10MB count=2 iflag=skip_bytes skip="$truncsize"
+			dd if="$filename" of="$partialfile" bs=10MB count=2 iflag=skip_bytes skip="$truncsize"
+
+			#chuan bi file cat
+			touch "$catfileinremote"
+			truncate -s 0 "$catfileinremote"
+			echo 'cat "$1" >> "$2"' >> "$catfileinremote"
+			echo 'rm "$1"' >> "$catfileinremote"
+
+			#bat dau cat
+			mv "$filename" "$newfilename"
 			truncate -s "$truncsize" "$newfilename"
-			cat "$uploadfilename" >> "$newfilename"
-			rm "$uploadfilename"
+			
+			bash "$catfileinremote" "$uploadfilename" "$newfilename" &
+			
+			while true; do
+				if [ -f "$uploadfilename" ] ; then
+					#echo 'sleep 1s'
+					sleep 1
+				else
+					break
+				fi
+			done
+			
+			#cat "$uploadfilename" >> "$newfilename"
+			#rm "$uploadfilename"
+			
 		#neu copy xong
 		else
 			mv "$uploadfilename" "$newfilename"
 		fi
-		
-		#phai lay lai filesize
-		filesize=$(wc -c "$newfilename" | awk '{print $1}')
-		filesize=$(( $filesize - 1 ))
-		truncate -s "$filesize" "$newfilename"
 
 		exit 0
 		
