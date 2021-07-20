@@ -454,7 +454,8 @@ append_native_file(){
 	local dir2=$2
 	local filename=$3
 	local filesizeinremote=$4
-	#local hashfilebeforeup=$5
+	local hashfilebeforeup=$5
+	local hashfileafterup
 	local filenameinhex=$(echo "$dir2"/"$filename" | tr -d '\n' | xxd -pu -c 1000000)
 	local result
 	local cmd
@@ -467,8 +468,10 @@ append_native_file(){
 	local newfilesize
 	local checksize
 	local tempfilename="tempfile.being"
-	local tempfilename_inremote="readyfile.being"
 	local end
+	local truncateparam4
+	local endfilename_inremote="readyfile.ending"
+	
 	declare -a getpipest
 	
 	#echo "$dir2""/""$filename"
@@ -542,9 +545,13 @@ append_native_file(){
 		
 		newfilesize=$(wc -c "$dir1"/"$filename" | awk '{print $1}')
 		echo "$newfilesize"
-		if [ ! "$newfilesize" ] || [ "$newfilesize" -ne "$filesize" ] || [ "$checksize" -ge "$filesize" ] ; then
+		if [ ! "$newfilesize" ] || [ "$newfilesize" -ne "$filesize" ] ; then
+			end=2
+			truncateparam4=2
+			echo "ket thuc 2"
+		elif [ "$checksize" -ge "$filesize" ] ; then
 			end=1
-			echo "ket thuc"
+			echo "ket thuc 1"
 		fi
 		
 		if [ "$newfilesize" -eq "$filesize" ] ; then
@@ -629,7 +636,7 @@ append_native_file(){
 			SECONDS=0
 			#rsync tu khoi phuc khi mat mang, co mang lai
 			echo 'append last of file'
-			rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"/home/backup/.temp/readyfile.ending"
+			rsync -vah --append -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"$memtemp_remote"/"$endfilename_inremote"
 			cmd=$?
 			myprintf "append last of file in remote" "$cmd"
 			
@@ -639,6 +646,17 @@ append_native_file(){
 				return 1
 			fi
 			
+			hashfileafterup=$(md5sum "$dir1"/"$filename" | awk '{ print $1 }')
+			if [ "$hashfileafterup" == "$hashfilebeforeup" ] ; then
+				truncateparam4=1
+			else
+				echo "hashfileafterup ko bang hashfilebeforeup:""$hashfileafterup"
+				truncateparam4=2
+			fi
+		fi
+		
+		if [ "$end" -ne 0 ] ; then
+
 			for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
 			do	
 				#vuot timeout
@@ -648,7 +666,7 @@ append_native_file(){
 				fi
 				
 				echo 'begin movement file'
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 1")
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 ${truncateparam4}")
 				cmd=$?
 				myprintf "movement file in remote" "$cmd"
 			
@@ -660,7 +678,12 @@ append_native_file(){
 				fi	
 			done
 			
-			return 0
+			if [ "$truncateparam4" -eq 1 ] ; then
+				return 0
+			else
+				return 1
+			fi
+		
 		fi
 	done
 }
@@ -724,8 +747,8 @@ append_file_with_hash_checking(){
 			
 			if [ "$hashlocalfile" == "$hashremotefile" ] ; then
 				echo 'has same md5hash after truncate-->continue append'
-				#hashlocalfile=$(md5sum "$param1"/"$filename" | awk '{ print $1 }')
-				append_native_file "$param1" "$param2" "$filename" "$filesize_remote"
+				hashlocalfile=$(md5sum "$param1"/"$filename" | awk '{ print $1 }')
+				append_native_file "$param1" "$param2" "$filename" "$filesize_remote" "$hashlocalfile"
 				return "$?"
 			else
 				echo 'no same md5hash after truncate-->copy total file'
@@ -750,9 +773,9 @@ copy_file() {
 	local dir2=$2
 	local filename=$3
 	
-	#hashlocalfile=$(md5sum "$dir1"/"$filename" | awk '{ print $1 }')
+	hashlocalfile=$(md5sum "$dir1"/"$filename" | awk '{ print $1 }')
 	
-	append_native_file "$dir1" "$dir2" "$filename" 0
+	append_native_file "$dir1" "$dir2" "$filename" 0 "$hashlocalfile"
 	
 	return "$?"
 }
@@ -805,13 +828,14 @@ main(){
 	
 }
 
+mainhash=$(md5sum "/home/dungnt/ShellScript/tối quá"/"file500mb.txt" | awk '{ print $1 }')
 #main
 #find_list_same_files "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
 #find_list_same_dirs "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
 #sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt"
-#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt" 50000000
+#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt" 20000000 "$mainhash"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi"
-#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi" 1
-#copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file300mb.txt"
-append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file300mb.txt" 10000
+#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi" 1 "$mainhash"
+#copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file500mb.txt"
+append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file500mb.txt" 16 "$mainhash"
