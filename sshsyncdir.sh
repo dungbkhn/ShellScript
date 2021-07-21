@@ -22,7 +22,7 @@ dir_contains_uploadfiles="$appdir_local"/remotefiles
 destipv6addr="backup@"
 destipv6addr_scp="backup@[]"
 
-filepubkey=/home/dungnt/.ssh/id_ed25519.pub
+fileprivatekey=/home/dungnt/.ssh/id_ed25519_privatekey
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
 logtimefile=logtimefile.txt
 #file mang thong tin ds file trong dir --> up len de so sanh
@@ -102,9 +102,9 @@ verify_logged() {
 	
 	kq=1
 	
-	if [ -f "$filepubkey" ] ; then
+	if [ -f "$fileprivatekey" ] ; then
 	
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "tail ${logtimedir_remote}/${logtimefile}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "tail ${logtimedir_remote}/${logtimefile}")
 		cmd=$?
 		echo "$result"
 		
@@ -178,15 +178,15 @@ find_list_same_files () {
 
 	cd "$workingdir"/
 	
-	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$mytemp"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
+	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" -p "$mytemp"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd1=$?
 	myprintf "scp 1 listfile" "$cmd1"
 			
-	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" -p "$dir_contains_uploadfiles"/"$compare_listfile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd2=$?
 	myprintf "scp 1 shellfile" "$cmd2"
 
-	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
+	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "rm ${memtemp_remote}/${outputfile_inremote}")
 	cmd3=$?
 	
 	myprintf "ssh remove old outputfile" "$cmd3"
@@ -195,7 +195,7 @@ find_list_same_files () {
 	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -ne 255 ] ; then
 		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
 		do
-			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listfile_inremote} ${listfiles} ${pathname} ${outputfile_inremote}")
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listfile_inremote} ${listfiles} ${pathname} ${outputfile_inremote}")
 			cmd=$?
 			myprintf "ssh generate new outputfile" "$cmd"
 			if [ "$cmd" -eq 0 ] ; then
@@ -206,7 +206,7 @@ find_list_same_files () {
 		done
 		
 		if [ "$cmd" -eq 0 ] ; then
-			result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
+			result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputfile_inremote" "$mytemp"/)
 			cmd=$?
 			myprintf "scp getback outputfile" "$cmd"
 		fi
@@ -263,15 +263,15 @@ find_list_same_dirs () {
 	
 	cd "$workingdir"/
 	
-	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$memtemp_local"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
+	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" -p "$memtemp_local"/"$listfiles" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd1=$?
 	myprintf "scp 1 listfile" "$cmd1"
 			
-	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$compare_listdir_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+	result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" -p "$dir_contains_uploadfiles"/"$compare_listdir_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
 	cmd2=$?
 	myprintf "scp 1 shellfile" "$cmd2"
 
-	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "rm ${memtemp_remote}/${outputdir_inremote}")
+	result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "rm ${memtemp_remote}/${outputdir_inremote}")
 	cmd3=$?
 	
 	myprintf "ssh remove old outputfile" "$cmd3"
@@ -280,7 +280,7 @@ find_list_same_dirs () {
 	if [ "$cmd1" -eq 0 ] && [ "$cmd2" -eq 0 ] && [ "$cmd3" -ne 255 ] ; then
 		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
 		do
-			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listdir_inremote} ${listfiles} ${pathname} ${outputdir_inremote}")
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "bash ${memtemp_remote}/${compare_listdir_inremote} ${listfiles} ${pathname} ${outputdir_inremote}")
 			cmd=$?
 			myprintf "ssh generate new outputdir" "$cmd"
 			if [ "$cmd" -eq 0 ] ; then
@@ -291,7 +291,7 @@ find_list_same_dirs () {
 		done
 		
 		if [ "$cmd" -eq 0 ] ; then
-			result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputdir_inremote" "$memtemp_local"/)
+			result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" -p "$destipv6addr_scp":"$memtemp_remote"/"$outputdir_inremote" "$memtemp_local"/)
 			cmd=$?
 			myprintf "scp getback outputdir" "$cmd"
 		fi
@@ -484,11 +484,11 @@ append_native_file(){
 			return 1
 		fi
 		
-		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$truncatefile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" -p "$dir_contains_uploadfiles"/"$truncatefile_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
 		cmd1=$?
 		myprintf "scp 1 truncatefile" "$cmd1"
 		
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 0 ${filesizeinremote}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 0 ${filesizeinremote}")
 		cmd2=$?
 		myprintf "run truncatefile in remote" "$cmd2"
 		
@@ -523,7 +523,7 @@ append_native_file(){
 			cmd1=$?
 			myprintf "verify active user" "$cmd1"
 		
-			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "netstat -atn | grep ':22 ' | grep 'ESTABLISHED' | wc -l")
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "netstat -atn | grep ':22 ' | grep 'ESTABLISHED' | wc -l")
 			cmd2=$?
 			myprintf "run countsshuser" "$cmd2"
 			myprintf "num sshuser" "$result"
@@ -570,7 +570,7 @@ append_native_file(){
 				echo "cutsize: ""$cutsize"
 				SECONDS=0
 				
-				dd if="$dir1"/"$filename" bs="8M" count=32 skip="$cutsize" | ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" dd of="$memtemp_remote"/"$tempfilename"
+				dd if="$dir1"/"$filename" bs="8M" count=32 skip="$cutsize" | ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" dd of="$memtemp_remote"/"$tempfilename"
 				
 				getpipest=( "${PIPESTATUS[@]}" )
 				echo "upload file to remote ""${getpipest[0]}"" va ""${getpipest[1]}"
@@ -596,7 +596,7 @@ append_native_file(){
 				
 				echo 'begin cat partial file'
 				SECONDS=0
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1")
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 1")
 				cmd=$?
 
 				myprintf "run catfile in remote" "$cmd"
@@ -622,7 +622,7 @@ append_native_file(){
 				
 				
 				echo 'begin truncate end file'
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 0 ${uploadsize} ${filesizeinremote}")
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 0 ${uploadsize} ${filesizeinremote}")
 				cmd=$?
 				myprintf "truncate end file in remote" "$cmd"
 				
@@ -639,7 +639,7 @@ append_native_file(){
 			SECONDS=0
 			#rsync tu khoi phuc khi mat mang, co mang lai
 			echo 'append last of file'		
-			rsync -vah --append --iconv=utf-8,utf-8 --protect-args -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${filepubkey}" "$dir1"/"$filename" "$destipv6addr_scp":"$dir2"/"$filename"".concatenating"
+			rsync -vah --append --iconv=utf-8,utf-8 --protect-args -e "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i ${fileprivatekey}" "$dir1"/"$filename" "$destipv6addr_scp":"$dir2"/"$filename"".concatenating"
 			cmd=$?
 			myprintf "append last of file in remote" "$cmd"
 			
@@ -669,7 +669,7 @@ append_native_file(){
 				fi
 				
 				echo 'begin movement file'
-				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 ${truncateparam4} ${filesizeinremote}")
+				result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "bash ${memtemp_remote}/${truncatefile_inremote} ${memtemp_remote}/${tempfilename} ${filenameinhex} 2 ${truncateparam4} ${filesizeinremote}")
 				cmd=$?
 				myprintf "movement file in remote" "$cmd"
 			
@@ -720,11 +720,11 @@ append_file_with_hash_checking(){
 			return 1
 		fi
 		
-		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" -p "$dir_contains_uploadfiles"/"$getmd5hash_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
+		result=$(scp -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" -p "$dir_contains_uploadfiles"/"$getmd5hash_inremote" "$destipv6addr_scp":"$memtemp_remote"/)
 		cmd1=$?
 		myprintf "scp 1 shellmd5hashfile" "$cmd1"
 	
-		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "bash ${memtemp_remote}/${getmd5hash_inremote} ${tempfilename}")
+		result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "bash ${memtemp_remote}/${getmd5hash_inremote} ${tempfilename}")
 		cmd2=$?
 		echo "get ""$cmd2"" md5sum:""$result"
 		
@@ -800,10 +800,10 @@ main(){
 		cmd=$?
 		myprintf "check network" "$cmd"
 		
-		if [ "$cmd" -eq 0 ] && [ -f "$filepubkey" ] ; then
+		if [ "$cmd" -eq 0 ] && [ -f "$fileprivatekey" ] ; then
 			
 			#add to know_hosts for firsttime
-			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$filepubkey" "$destipv6addr" "mkdir ${memtemp_remote}")
+			result=$(ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -i "$fileprivatekey" "$destipv6addr" "mkdir ${memtemp_remote}")
 			cmd=$?
 			myprintf "mkdir temp at remote" "$cmd"
 
@@ -831,14 +831,14 @@ main(){
 	
 }
 
-mainhash=$(md5sum "/home/dungnt/ShellScript/tối quá"/"file500mb.txt" | awk '{ print $1 }')
+#mainhash=$(md5sum "/home/dungnt/ShellScript/tối quá"/"file500mb.txt" | awk '{ print $1 }')
 #main
 #find_list_same_files "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
 #find_list_same_dirs "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
-#sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
+sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt"
 #append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt" 20000000 "$mainhash"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi"
 #append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi" 1 "$mainhash"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file500mb.txt"
-append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file500mb.txt" 200000000 "$mainhash"
+#append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file500mb.txt" 200000000 "$mainhash"
