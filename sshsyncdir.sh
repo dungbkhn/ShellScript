@@ -3,9 +3,6 @@
 shopt -s dotglob
 shopt -s nullglob
 
-dir_ori=/home/dungnt/ShellScript/dirtest1
-dir_dest=/home/backup/storageBackup
-
 appdir_local=/home/dungnt/ShellScript/sshsyncapp
 appdir_remote=/home/backup
 
@@ -16,11 +13,10 @@ compare_listdir_inremote=comparelistdir_remote.sh
 compare_listfile_inremote=comparelistfile_remote.sh
 getmd5hash_inremote=getmd5hash_inremote.sh
 truncatefile_inremote=truncatefile_inremote.sh
-catfile_inremote=catfile_inremote.sh
 dir_contains_uploadfiles="$appdir_local"/remotefiles
 
-destipv6addr="backup@"
-destipv6addr_scp="backup@[]"
+destipv6addr="backup@192.168.1.58"
+destipv6addr_scp="backup@[192.168.1.58]"
 
 fileprivatekey=/home/dungnt/.ssh/id_ed25519_privatekey
 logtimedir_remote=/home/dungnt/MyDisk_With_FTP/logtime
@@ -34,7 +30,8 @@ uploadmd5hashfile=md5hashfile_fromlocal.txt
 sleeptime=5
 #for PRINTING
 prt=1
-
+#for OS Ubuntu 64
+OS_Ver=1
 
 #----------------------------------------TOOLS-------------------------------------
 
@@ -64,19 +61,28 @@ check_network(){
 	#trang thai mac dinh=1:ko co mang
 	state=1
 	
-	ping -c 1 -W 1 -4 google.com
-	cmd=$?
+	if [ "$OS_Ver" -eq 1 ] ; then
+		ping -c 1 -W 1 -4 google.com > /dev/null
+		cmd=$?
+	else
+		ping -4 google.com > /dev/null
+		cmd=$?
+	fi
 	
 	if [ "$cmd" -eq 0 ] ; then
 		#co mang
 		state=0
 	fi 
 	
-	if [ "$state" -eq 0 ] ; then
+	if [ "$state" -eq 1 ] ; then
+		if [ "$OS_Ver" -eq 1 ] ; then
+			ping -c 1 -W 1 -4 vnexpress.net > /dev/null
+			cmd=$?
+		else
+			ping -4 vnexpress.net > /dev/null
+			cmd=$?
+		fi
 	
-		ping -c 1 -W 1 -4 vnexpress.net
-		cmd=$?
-
 		if [ "$cmd" -eq 0 ] ; then
 			#co mang
 			state=0
@@ -470,7 +476,6 @@ append_native_file(){
 	local tempfilename="tempfile.being"
 	local end
 	local truncateparam4
-	local endfilename_inremote="readyfile.ending"
 	local uploadsize
 	
 	declare -a getpipest
@@ -508,7 +513,7 @@ append_native_file(){
 		return 1
 	fi
 	
-	uploadsize=$(( $filesize - $filesizeinremote))
+	uploadsize=$(( $filesize - ($filesizeinremote / (8*1024*1024))*(8*1024*1024) ))
 	
 	while true; do
 		for (( loopforcount=0; loopforcount<21; loopforcount+=1 ));
@@ -831,11 +836,11 @@ main(){
 	
 }
 
-#mainhash=$(md5sum "/home/dungnt/ShellScript/tối quá"/"file500mb.txt" | awk '{ print $1 }')
-#main
+#mainhash=$(md5sum "/home/dungnt/ShellScript/tối quá"/"file tét.txt" | awk '{ print $1 }')
+main
 #find_list_same_files "/home/dungnt/ShellScript/tối quá" "/home/backup/biết sosanh"
 #find_list_same_dirs "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
-sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
+#sync_dir "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt"
 #append_native_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "file tét.txt" 20000000 "$mainhash"
 #copy_file "/home/dungnt/ShellScript/tối quá" "/home/backup/so sánh thư mục" "noi"
