@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 get_router_baseIP(){
 	local IFS
 	local strarr
@@ -28,157 +27,302 @@ get_router_baseIP(){
 
 #------------------------------------ MAIN ---------------------------------
 
-#printf "Begin\n" > /home/dungnt/routerip.txt
+file1=/home/dungnt/MyLog/routerip1.txt
+file2=/home/dungnt/MyLog/routerip2.txt
+filesizeforswich=5000
 
 while true ; do
+	hasoldfile=0
+	oldfile=null
+	mainfile=$file1
+	haslongsleep=0
+	numberreset=0
 
-	printf "#-----------------Begin-------------------#\n" > /home/dungnt/MyLog/routerip.txt
+	if [ -f "$file1" ] ; then
+		filesize1=$(wc -c "$file1" | awk '{print $1}')
+		mtime1=$(stat "$file1" --printf='%y\n')
+		mtime1=$(date +'%s' -d "$mtime1")
+	else
+		filesize1=0
+	fi
+
+	if [ -f "$file2" ] ; then
+		filesize2=$(wc -c "$file2" | awk '{print $1}')
+		mtime2=$(stat "$file2" --printf='%y\n')
+		mtime2=$(date +'%s' -d "$mtime2")
+	else
+		filesize2=0
+	fi
+
+	if [ "$filesize1" -eq 0 ] && [ "$filesize2" -eq 0 ] ; then
+		mainfile=$file1
+		rm "$file1" > /dev/null
+		rm "$file2" > /dev/null
+		touch "$file1"
+		hasoldfile=0
+	elif [ "$filesize2" -eq 0 ] ; then
+		rm "$file2" > /dev/null
+		hasoldfile=1
+		if [ "$filesize1" -gt "$filesizeforswich" ] ; then
+			mainfile=$file2
+			touch "$file2"
+		else
+			mainfile=$file1
+		fi
+	elif [ "$filesize1" -eq 0 ] ; then
+		mainfile=$file1
+		rm "$file1" > /dev/null
+		rm "$file2" > /dev/null
+		touch "$file1"
+		hasoldfile=0
+	else
+		if [ "$filesize1" -gt "$filesizeforswich" ] && [ "$filesize2" -gt "$filesizeforswich" ] ; then
+			if [ "$mtime1" -gt "$mtime2" ] ; then
+				#dang write vao file 1, chon file 2
+				hasoldfile=1
+				rm "$file2" > /dev/null
+				touch "$file2"
+				mainfile=$file2
+			else
+				#dang write vao file 2, chon file 1
+				hasoldfile=2
+				rm "$file1" > /dev/null
+				touch "$file1"
+				mainfile=$file1
+			fi
+		elif [ "$filesize1" -lt "$filesizeforswich" ] && [ "$filesize2" -gt "$filesizeforswich" ] ; then
+			mainfile=$file1
+			hasoldfile=1
+		elif [ "$filesize1" -gt "$filesizeforswich" ] && [ "$filesize2" -lt "$filesizeforswich" ] ; then
+			mainfile=$file2
+			hasoldfile=2
+		elif [ "$filesize1" -lt "$filesizeforswich" ] && [ "$filesize2" -lt "$filesizeforswich" ] ; then
+			mainfile=$file1
+			rm "$file1" > /dev/null
+			rm "$file2" > /dev/null
+			touch "$file1"
+			hasoldfile=0
+		fi
+	fi
 	
-	sleep 1m
+	if [ "$hasoldfile" -ne 0 ] ; then
+		#read old file
+		if [ "$hasoldfile" -eq 1 ] ; then
+			oldfile=$file1
+		elif [ "$hasoldfile" -eq 2 ] ; then
+			oldfile=$file2
+		fi
+		
+		count=0
+		while IFS= read -r line
+		do
+			if [ "$line" == "######" ] ; then
+				count=$(( $count + 1 ))
+			elif [ "$count" -eq 1 ] ; then
+				haslongsleep="$line"
+				count=$(( $count + 1 ))
+			elif [ "$count" -eq 2 ] ; then
+				numberreset="$line"
+				count=$(( $count + 1 ))
+			fi
+		done <<< "$(tail -n 3 ${oldfile})"
+		
+		if [ "$count" -eq 0 ] ; then
+			mainfile=$file1
+			rm "$file1" > /dev/null
+			rm "$file2" > /dev/null
+			touch "$file1"
+			oldfile=null
+			hasoldfile=0
+		fi
+	fi
+	
+	printf "#-----------------Begin-------------------#\n" >> "$mainfile"
+	
+	echo "mainfile:""$mainfile" >> "$mainfile"
+	echo "oldfile:""$oldfile" >> "$mainfile"
+	echo "haslongsleep:""$haslongsleep" >> "$mainfile"
+	echo "numberreset:""$numberreset" >> "$mainfile"
+	
+	echo "mainfile:""$mainfile"
+	echo "oldfile:""$oldfile"
+	echo "haslongsleep:""$haslongsleep"
+	echo "numberreset:""$numberreset"
+	
+	printf "#-----------------Wait 50s for mouting-------------------#\n" >> "$mainfile"
+	
+	sleep 50
+	
+	printf "#-----------------OK, Try Ping -------------------#\n" >> "$mainfile"
 	
 	#trang thai mac dinh=1:ko co mang
 	state=1
 	
-	ping -c 1 -W 1 -4 google.com
+	ping -c 1 -W 1 -6 google.com > /dev/null
 	cmd=$?
 	
 	if [ "$cmd" -eq 0 ] ; then
 		#co mang
-		diff /etc/network/interfaces /etc/network/interfaces.auto
+		diff /etc/network/interfaces /etc/network/interfaces.auto > /dev/null
 		cmd=$?
 
-		printf "ping0ok\n" >> /home/dungnt/MyLog/routerip.txt 
-		echo "ping0ok"
+		printf "ping0 ok\n" >> "$mainfile"
+		echo "ping0 ok"
 
 		if [ "$cmd" -eq 0 ] ; then
-			#hai file giong het nhau  ----> trang thai 2
-			state=2
-		else
+			#hai file giong het nhau  ----> trang thai 3
 			state=3
+		else
+			state=2
 		fi
+	else
+		printf "ping0 fail\n" >> "$mainfile"
 	fi 
 	
-	for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40
-	do
-	    #echo "Welcome $i times"
+	ping -c 1 -W 1 -6 vnexpress.net > /dev/null
+	cmd=$?
+	
+	if [ "$cmd" -eq 0 ] ; then
+		#co mang
+		diff /etc/network/interfaces /etc/network/interfaces.auto > /dev/null
+		cmd=$?
 
-		sleep 1
-		
-		if [ "$state" -eq 1 ] ; then
-		
-			ping -c 1 -W 1 -4 vnexpress.net
+		printf "ping1 ok\n" >> "$mainfile"
+		echo "ping1 ok"
+
+		if [ "$cmd" -eq 0 ] ; then
+			#hai file giong het nhau  ----> trang thai 3
+			state=3
+		else
+			state=2
+		fi
+	else
+		printf "ping1 fail\n" >> "$mainfile"
+	fi 
+	
+	if [ "$state" -eq 1 ] ; then
+		loopforcount=0
+		for (( loopforcount=2; loopforcount<25; loopforcount+=1 ));
+		do
+			#echo "Welcome $i times"
+
+			sleep 1
+			
+			ping -c 1 -W 1 -6 vnexpress.net > /dev/null
 			cmd=$?
 
 			if [ "$cmd" -eq 0 ] ; then
 				#co mang
-				diff /etc/network/interfaces /etc/network/interfaces.auto
+				diff /etc/network/interfaces /etc/network/interfaces.auto > /dev/null
 				cmd=$?
 
-				printf "ping%sok\n" "$i" >> /home/dungnt/MyLog/routerip.txt
-				echo "ping""$i""ok"
+				#printf "ping%s ok\n" "$loopforcount" >> "$mainfile"
+				echo "ping""$loopforcount"" ok"
 
 				if [ "$cmd" -eq 0 ] ; then
-					#hai file giong het nhau  ----> trang thai 2
-					state=2
-				else
+					#hai file giong het nhau  ----> trang thai 3
 					state=3
+				else
+					state=2
 				fi
+				
+				break
+			
 			fi 
 			
-		fi
-
-		
-		sleep 1
-		
-		if [ "$state" -eq 1 ] ; then
-		
-			ping -c 1 -W 1 -4 google.com
+			sleep 1
+						
+			ping -c 1 -W 1 -6 google.com > /dev/null
 			cmd=$?
 
-					
 			if [ "$cmd" -eq 0 ] ; then
 				#co mang
-				diff /etc/network/interfaces /etc/network/interfaces.auto
+				diff /etc/network/interfaces /etc/network/interfaces.auto > /dev/null
 				cmd=$?
 
-				printf "ping%sok\n" "$i" >> /home/dungnt/MyLog/routerip.txt
-				echo "ping""$i""ok"
+				#printf "ping%s ok\n" "$loopforcount" >> "$mainfile"
+				echo "ping""$loopforcount"" ok"
 
 				if [ "$cmd" -eq 0 ] ; then
-					#hai file giong het nhau  ----> trang thai 2
-					state=2
-				else
+					#hai file giong het nhau  ----> trang thai 3
 					state=3
+				else
+					state=2
 				fi
-			fi 
+				
+				break
 			
-		fi
-
-	done
+			fi 
+		done
+	fi
+	
+	printf "state:%s\n" "$state" >> "$mainfile"
 	
 	sleep 2
 	
 	#mat network
-	if [ "$state" -eq 1 ] ; then
+	if [ "$state" -eq 1 ] && [ "$numberreset" -lt 3 ] ; then
 		#trang thai 1
-		#echo 'mat mang
-		printf "%s\n" "trang thai 1" >> /home/dungnt/MyLog/routerip.txt
+		#mat mang
+		printf "%s\n" "trang thai 1" >> "$mainfile"
 		echo "trangthai1"
 		cp /etc/network/interfaces.auto /etc/network/interfaces
-		sleep 30
-		/sbin/reboot
-	elif [ "$state" -eq 2 ] ; then
+		printf "%s\n" "trang thai 1 - need reset" >> "$mainfile"
+		echo "trang thai 1"
+		echo "######" >> "$mainfile"
+		#longsleep no
+		echo "0" >> "$mainfile"
+		#numberreset ++
+		numberreset=$(( $numberreset + 1 ))
+		echo "$numberreset" >> "$mainfile"
+		echo "trang thai 1 - reset"
+		sleep 15
+		systemctl restart networking > /dev/null
+		ifdown eth0 && ifup eth0 > /dev/null
+	elif [ "$state" -eq 2 ] && [ "$numberreset" -lt 3 ] ; then
 		#trang thai 2
-		routerip=$(/sbin/ifconfig | grep 'inet6' | grep 'scopeid 0x0<global>' | awk '{print $2}')
-		result=$(get_router_baseIP "$routerip")
-		
-		printf "#ipv6 manual config\n" >> /etc/network/interfaces
-		printf "auto eth0\n" >> /etc/network/interfaces
-		printf "iface eth0 inet6 static\n" >> /etc/network/interfaces
-		printf "address ""$result""::e\n" >> /etc/network/interfaces
-		printf "netmask 64\n" >> /etc/network/interfaces
-		printf "gateway ""$result""::0\n" >> /etc/network/interfaces
-		printf "######" >> /etc/network/interfaces
-		
-		printf "%s\n" "trang thai 2" >> /home/dungnt/MyLog/routerip.txt
+		#co mang nhung file interfaces chua dung
+		printf "%s\n" "trang thai 2" >> "$mainfile"
 		echo "trangthai2"
-
-		sleep 30
-		/sbin/reboot
-	else
+		cp /etc/network/interfaces.auto /etc/network/interfaces
+		printf "%s\n" "trang thai 2 - need reset" >> "$mainfile"
+		echo "trang thai 2"
+		echo "######" >> "$mainfile"
+		#longsleep no
+		echo "0" >> "$mainfile"
+		#numberreset ++
+		numberreset=$(( $numberreset + 1 ))
+		echo "$numberreset" >> "$mainfile"
+		echo "trang thai 2 - reset"
+		sleep 15
+		systemctl restart networking > /dev/null
+		ifdown eth0 && ifup eth0 > /dev/null
+	elif [ "$state" -eq 3 ] && [ "$numberreset" -lt 3 ] ; then
 		#trang thai 3
-		routerip=$(/sbin/ifconfig | grep 'inet6' | grep 'scopeid 0x0<global>' | awk '{print $2}')
+		routerip=$(ifconfig | grep 'inet6' | grep 'scopeid 0x0<global>' | awk '{print $2}')
 		result=$(get_router_baseIP "$routerip")
-		cp /etc/network/interfaces.auto /etc/network/interfaces.being
-		
-		printf "#ipv6 manual config\n" >> /etc/network/interfaces.being
-		printf "auto eth0\n" >> /etc/network/interfaces.being
-		printf "iface eth0 inet6 static\n" >> /etc/network/interfaces.being
-		printf "address ""$result""::e\n" >> /etc/network/interfaces.being
-		printf "netmask 64\n" >> /etc/network/interfaces.being
-		printf "gateway ""$result""::0\n" >> /etc/network/interfaces.being
-		printf "######" >> /etc/network/interfaces.being
-		
-		diff /etc/network/interfaces /etc/network/interfaces.being
-		cmd=$?
-		
-		if [ "$cmd" -eq 0 ] ; then
-			#hai file giong het nhau  ----> trang thai 3.0
-			printf "%s\n" "trang thai 3.0, moi thu ok" >> /home/dungnt/MyLog/routerip.txt
-			echo "trangthai3.0"
-			rm /etc/network/interfaces.being
-		else
-			#trang thai 3.1
-			printf "%s\n" "trang thai 3.1, ipv6 chua chuan" >> /home/dungnt/MyLog/routerip.txt
-			echo "trangthai3.1"
-			mv /etc/network/interfaces.being /etc/network/interfaces
-			sleep 30
-			/sbin/reboot
-		fi
+		#can gui IPV6 len server
+		echo "myip ""$routerip"
+		printf "%s\n" "trang thai 3 - ok" >> "$mainfile"
+		echo "######" >> "$mainfile"
+		#longsleep yes
+		echo "1" >> "$mainfile"
+		#numberreset no
+		echo "0" >> "$mainfile"
+		echo "trang thai 3 - ok"
+		sleep 20m
+	else
+		printf "%s\n" "numberreset qua lon" >> "$mainfile"
+		printf "%s\n" "sleep 15m" >> "$mainfile"
+		echo "######" >> "$mainfile"
+		#longsleep yes
+		echo "1" >> "$mainfile"
+		#numberreset no
+		echo "0" >> "$mainfile"
+		echo "sleep 20m"
+		sleep 20m
 	fi
-	
-	echo "sleep 15m"
-	sleep 15m
+
 done
 
 
