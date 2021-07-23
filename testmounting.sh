@@ -1,24 +1,53 @@
 #!/bin/bash
 
+#NOTE: run with sudo
+
 shopt -s dotglob
 shopt -s nullglob
 
 logfile=/home/dungnt/MyLog/logmounting.txt
 mainlocation=/var/res/share
 slavelocation=/var/res/backup
+
+disk1=sda
+disk2=sdb
+disk3=sdc
+
 dev1=sda1
 dev2=sdb1
 dev3=sdc1
+
+cmdouput1=$(lsblk | grep "$disk1")
+cmdouput2=$(lsblk | grep "$dev1")
+
+if [ "$cmdouput1" ] && [ ! "$cmdouput2" ] ; then
+	echo 'begin parted /dev/'"$disk1"
+	parted -a optimal /dev/"$disk1" mkpart primary 0% 100%
+fi
+
+cmdouput1=$(lsblk | grep "$disk2")
+cmdouput2=$(lsblk | grep "$dev2")
+
+if [ "$cmdouput1" ] && [ ! "$cmdouput2" ] ; then
+	echo 'begin parted /dev/'"$disk2"
+	parted -a optimal /dev/"$disk2" mkpart primary 0% 100%
+fi
+
+cmdouput1=$(lsblk | grep "$disk3")
+cmdouput2=$(lsblk | grep "$dev3")
+
+if [ "$cmdouput1" ] && [ ! "$cmdouput2" ] ; then
+	echo 'begin parted /dev/'"$disk3"
+	parted -a optimal /dev/"$disk3" mkpart primary 0% 100%
+fi
 
 disks_space() {
 	local param=$1
 	local kq
 	local num
 	
-    #! df -P | awk '{print $5}' | grep -Fqx '100%'
     kq=$(lsblk | grep "$param" | awk '{print $4}')
-    #kq=${kq%G}
-    #NUMBER=$(echo "$kq" | grep -o -E '[0-9]+')
+    
     if [ "$kq" ] ; then		
 		num=$(echo $kq | sed -r 's/^([^.]+).*$/\1/; s/^[^0-9]*([0-9]+).*$/\1/')
 	else
@@ -34,7 +63,7 @@ check_disks_type() {
 	local kq
 	local num
 	
-    kq=$(/sbin/blkid | grep "$param1" | grep "$param2")
+    kq=$(blkid | grep "$param1" | grep "$param2")
     if [ "$kq" ] ; then		
 		num=1
 	else
@@ -51,7 +80,7 @@ get_disks_uuid() {
 	local kq
 
 	
-    kq=$(/sbin/blkid | grep "$param" | awk '{for(i=2;i<=NF;i++){if($i~/^UUID=/){a=$i}} print a}')
+    kq=$(blkid | grep "$param" | awk '{for(i=2;i<=NF;i++){if($i~/^UUID=/){a=$i}} print a}')
 	
 	echo "$kq"
 }
@@ -114,7 +143,7 @@ do
 
 		if [ "${mytype[$i]}" -eq 0 ] && [ "${myspace[$i]}" -gt 0 ] ; then
 			umount /dev/"${myarr[$i]}"
-			/sbin/mkfs.exfat /dev/"${myarr[$i]}"
+			mkfs.exfat /dev/"${myarr[$i]}"
 			needreboot=1
 			cp /etc/fstab.save /etc/fstab
 		else
@@ -145,8 +174,9 @@ do
 done
 
 if [ "$needreboot" -eq 1 ] ; then
+	echo 'will reboot in 30s'
 	sleep 30
-	/sbin/reboot
+	reboot
 fi
 
 
@@ -177,14 +207,16 @@ if [ "$countdev" -ne "$countmounting" ] && [ "$countdev" -gt 0 ] ; then
 	if [ "$countdev" -eq 1 ] ; then
 		printf "%s\n" "$firstmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction,nodev,nofail,x-gvfs-show 0 0" >> /etc/fstab 
 		printf "n1:%s\n" "$firstmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction" >> "$logfile"
-		sleep 45
-		/sbin/reboot
+		echo 'will reboot in 30s'
+		sleep 30
+		reboot
 	else
 		printf "%s\n" "$secondmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction,nodev,nofail,x-gvfs-show 0 0" >> /etc/fstab
 		printf "%s\n" "$firstmaxuuid"" ""$slavelocation"" ""auto uid=backup,gid=backup,nodev,nofail,x-gvfs-show 0 0" >> /etc/fstab
 		printf "n2:%s\n" "$secondmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction" >> "$logfile"
-		sleep 45
-		/sbin/reboot
+		echo 'will reboot in 30s'
+		sleep 30
+		reboot
 	fi
 fi
 
@@ -192,9 +224,10 @@ if [ "$countdev" -eq "$countmounting" ] && [ "$countmounting" -eq 1 ] && [ "$has
 	cp /etc/fstab.save /etc/fstab
 	printf "%s\n" "$firstmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction,nodev,nofail,x-gvfs-show 0 0" >> /etc/fstab
 	printf "n3:%s\n" "$firstmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction" >> "$logfile"	
-	sleep 45
-	/sbin/reboot
+	echo 'will reboot in 30s'
+	sleep 30
+	reboot
 fi
 
-echo "mounting process successful!"
+echo "mounting process successfully!"
 printf "%s" "###ok###" >> "$logfile"
