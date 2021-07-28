@@ -278,7 +278,7 @@ while true ; do
 		echo "trang thai 1 - reset"
 		sleep 15
 		systemctl restart networking > /dev/null
-		ifdown eth0 && ifup eth0 > /dev/null
+		/sbin/ifdown eth0 && /sbin/ifup eth0 > /dev/null
 	elif [ "$state" -eq 2 ] && [ "$numberreset" -lt 3 ] ; then
 		#trang thai 2
 		#co mang nhung file interfaces chua dung
@@ -296,7 +296,7 @@ while true ; do
 		echo "trang thai 2 - reset"
 		sleep 15
 		systemctl restart networking > /dev/null
-		ifdown eth0 && ifup eth0 > /dev/null
+		/sbin/ifdown eth0 && /sbin/ifup eth0 > /dev/null
 	elif [ "$state" -eq 3 ] && [ "$numberreset" -lt 3 ] ; then
 		#trang thai 3
 		routerip=$(ifconfig | grep 'inet6' | grep 'scopeid 0x0<global>' | awk '{print $2}')
