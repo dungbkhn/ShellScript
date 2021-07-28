@@ -2,12 +2,16 @@
 
 #NOTE: run with sudo
 
+
 shopt -s dotglob
 shopt -s nullglob
 
 logfile=/home/dungnt/MyLog/logmounting.txt
 mainlocation=/var/res/share
 slavelocation=/var/res/backup
+
+touch "$logfile"
+truncate -s 0 "$logfile"
 
 disk1=sda
 disk2=sdb
@@ -21,24 +25,24 @@ cmdouput1=$(lsblk | grep "$disk1")
 cmdouput2=$(lsblk | grep "$dev1")
 
 if [ "$cmdouput1" ] && [ ! "$cmdouput2" ] ; then
-	echo 'begin parted /dev/'"$disk1"
-	parted -a optimal /dev/"$disk1" mkpart primary 0% 100%
+	echo "begin parted /dev/""$disk1" >> "$logfile"
+	/sbin/parted -a optimal /dev/"$disk1" mkpart primary 0% 100%
 fi
 
 cmdouput1=$(lsblk | grep "$disk2")
 cmdouput2=$(lsblk | grep "$dev2")
 
 if [ "$cmdouput1" ] && [ ! "$cmdouput2" ] ; then
-	echo 'begin parted /dev/'"$disk2"
-	parted -a optimal /dev/"$disk2" mkpart primary 0% 100%
+	echo "begin parted /dev/""$disk2" >> "$logfile"
+	/sbin/parted -a optimal /dev/"$disk2" mkpart primary 0% 100%
 fi
 
 cmdouput1=$(lsblk | grep "$disk3")
 cmdouput2=$(lsblk | grep "$dev3")
 
 if [ "$cmdouput1" ] && [ ! "$cmdouput2" ] ; then
-	echo 'begin parted /dev/'"$disk3"
-	parted -a optimal /dev/"$disk3" mkpart primary 0% 100%
+	echo "begin parted /dev/""$disk3" >> "$logfile"
+	/sbin/parted -a optimal /dev/"$disk3" mkpart primary 0% 100%
 fi
 
 disks_space() {
@@ -63,7 +67,7 @@ check_disks_type() {
 	local kq
 	local num
 	
-    kq=$(blkid | grep "$param1" | grep "$param2")
+    kq=$(/sbin/blkid | grep "$param1" | grep "$param2")
     if [ "$kq" ] ; then		
 		num=1
 	else
@@ -80,7 +84,7 @@ get_disks_uuid() {
 	local kq
 
 	
-    kq=$(blkid | grep "$param" | awk '{for(i=2;i<=NF;i++){if($i~/^UUID=/){a=$i}} print a}')
+    kq=$(/sbin/blkid | grep "$param" | awk '{for(i=2;i<=NF;i++){if($i~/^UUID=/){a=$i}} print a}')
 	
 	echo "$kq"
 }
@@ -90,7 +94,7 @@ hasslave=0
 
 findmainlocation=$(df | grep "$mainlocation")
 
-echo "$findmainlocation"
+echo "$findmainlocation" >> "$logfile"
 
 if [ "$findmainlocation" ] ; then
 	countmounting=$(($countmounting + 1))
@@ -98,16 +102,16 @@ fi
 
 findslavelocation=$(df | grep "$slavelocation")
 
-echo "$findslavelocation"
+echo "$findslavelocation" >> "$logfile"
 
 if [ "$findslavelocation" ] ; then
 	countmounting=$(($countmounting + 1))
 	hasslave=$(($hasslave + 1))
 fi
 
-echo "countmounting=""$countmounting"
-echo "hasslave=""$hasslave"
-echo '-----------------------------------------------'
+echo "countmounting=""$countmounting" >> "$logfile"
+echo "hasslave=""$hasslave" >> "$logfile"
+echo "-----------------------------------------------" >> "$logfile"
 
 ## declare an array variable
 declare -a myarr=("$dev1" "$dev2" "$dev3")
@@ -124,7 +128,7 @@ secondname=""
 
 needreboot=0
 
-echo '---------------------Begin-------------------' > "$logfile"
+echo "---------------------Begin-------------------" >> "$logfile"
 
 ## now loop through the above array
 for i in "${!myarr[@]}"
@@ -143,11 +147,11 @@ do
 
 		if [ "${mytype[$i]}" -eq 0 ] && [ "${myspace[$i]}" -gt 0 ] ; then
 			umount /dev/"${myarr[$i]}"
-			mkfs.exfat /dev/"${myarr[$i]}"
+			/sbin/mkfs.exfat /dev/"${myarr[$i]}"
 			needreboot=1
 			cp /etc/fstab.save /etc/fstab
 		else
-			echo "type is exfat (1) or space is equal to 0, so do not need format in exfat fs"
+			echo "type is exfat (1) or space is equal to 0, so do not need format in exfat fs" >> "$logfile"
 		fi
    		
 		myuuid[$i]=$(get_disks_uuid "${myarr[$i]}")
@@ -155,28 +159,29 @@ do
 
 		if [ "${mytype[$i]}" -eq 1 ] ; then
 			if [ "${myspace[$i]}" -ge "$firstmax" ] ; then
-				secondmax=$firstmax
+				secondmax="$firstmax"
 				secondmaxuuid="$firstmaxuuid"
 				secondname="$firstname"
-				firstmax=${myspace[$i]}
+				firstmax="${myspace[$i]}"
 				firstmaxuuid="${myuuid[$i]}"
 				firstname="${myarr[$i]}"
 			elif [ "${myspace[$i]}" -gt "$secondmax" ] ; then
-				secondmax=${myspace[$i]}
-                                secondmaxuuid="${myuuid[$i]}"
-                                secondname="${myarr[$i]}"
+				secondmax="${myspace[$i]}"
+				secondmaxuuid="${myuuid[$i]}"
+				secondname="${myarr[$i]}"
 			fi
 		fi
 
 		
-		echo '------------------------------' >> "$logfile"
+		echo "------------------------------" >> "$logfile"
    fi
 done
 
 if [ "$needreboot" -eq 1 ] ; then
-	echo 'will reboot in 30s'
+	echo "1: will reboot in 30s" >> "$logfile"
+	echo "1: will reboot in 30s"
 	sleep 30
-	reboot
+	/sbin/reboot
 fi
 
 
@@ -188,6 +193,13 @@ echo "$firstname"
 echo "secondmax=""$secondmax"
 echo "$secondmaxuuid"
 echo "$secondname"
+
+echo "firsmax=""$firstmax" >> "$logfile"
+echo "$firstmaxuuid" >> "$logfile"
+echo "$firstname" >> "$logfile"
+echo "secondmax=""$secondmax" >> "$logfile"
+echo "$secondmaxuuid" >> "$logfile"
+echo "$secondname" >> "$logfile"
 
 if [ "$firstmax" -gt 0 ] ; then
 	countdev=$(($countdev + 1))
@@ -207,16 +219,18 @@ if [ "$countdev" -ne "$countmounting" ] && [ "$countdev" -gt 0 ] ; then
 	if [ "$countdev" -eq 1 ] ; then
 		printf "%s\n" "$firstmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction,nodev,nofail,x-gvfs-show 0 0" >> /etc/fstab 
 		printf "n1:%s\n" "$firstmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction" >> "$logfile"
-		echo 'will reboot in 30s'
+		echo "will reboot in 30s" >> "$logfile"
+		echo "2: will reboot in 30s"
 		sleep 30
-		reboot
+		/sbin/reboot
 	else
 		printf "%s\n" "$secondmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction,nodev,nofail,x-gvfs-show 0 0" >> /etc/fstab
 		printf "%s\n" "$firstmaxuuid"" ""$slavelocation"" ""auto uid=backup,gid=backup,nodev,nofail,x-gvfs-show 0 0" >> /etc/fstab
 		printf "n2:%s\n" "$secondmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction" >> "$logfile"
-		echo 'will reboot in 30s'
+		echo "will reboot in 30s" >> "$logfile"
+		echo "3: will reboot in 30s"
 		sleep 30
-		reboot
+		/sbin/reboot
 	fi
 fi
 
@@ -224,10 +238,12 @@ if [ "$countdev" -eq "$countmounting" ] && [ "$countmounting" -eq 1 ] && [ "$has
 	cp /etc/fstab.save /etc/fstab
 	printf "%s\n" "$firstmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction,nodev,nofail,x-gvfs-show 0 0" >> /etc/fstab
 	printf "n3:%s\n" "$firstmaxuuid"" ""$mainlocation"" ""auto uid=store,gid=restriction" >> "$logfile"	
-	echo 'will reboot in 30s'
+	echo "will reboot in 30s" >> "$logfile"
+	echo "4: will reboot in 30s"
 	sleep 30
-	reboot
+	/sbin/reboot
 fi
 
 echo "mounting process successfully!"
-printf "%s" "###ok###" >> "$logfile"
+echo "mounting process successfully!" >> "$logfile"
+echo "###ok###" >> "$logfile"
